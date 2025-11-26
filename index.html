@@ -75,10 +75,22 @@
         #text-area::-webkit-scrollbar { width: 10px; height: 10px; }
         #text-area::-webkit-scrollbar-track { background: rgba(10, 15, 30, 0.5); }
         #text-area::-webkit-scrollbar-thumb { background: #00ff88; border-radius: 5px; }
+        .play-counter {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1em;
+            color: #ffcc00;
+            text-shadow: 0 0 10px #ffcc00;
+            margin-bottom: 15px;
+            padding: 8px 20px;
+            background: rgba(22, 33, 62, 0.8);
+            border: 1px solid #ffcc00;
+            border-radius: 20px;
+        }
     </style>
 </head>
 <body>
     <h1 class="title">🎮 THE CONVERSATION GAME 🎮</h1>
+    <div class="play-counter">🌍 Global Plays: <span id="play-count">...</span></div>
     <div class="game-container">
         <div id="text-area"></div>
         <div class="input-section">
@@ -88,6 +100,19 @@
         </div>
     </div>
     <script>
+        // GLOBAL PLAY COUNTER
+        (async function() {
+            try {
+                // Using CountAPI - free counter service
+                const response = await fetch('https://api.countapi.xyz/hit/conversation-game-leo/plays');
+                const data = await response.json();
+                document.getElementById('play-count').textContent = data.value.toLocaleString();
+            } catch (e) {
+                // Fallback if API is down
+                document.getElementById('play-count').textContent = '∞';
+            }
+        })();
+
         // TRANSLATION SYSTEM - All game text in 4 languages
         const translations = {
             // === WELCOME & INSTRUCTIONS ===
