@@ -100,31 +100,33 @@
         </div>
     </div>
     <script>
-        // GLOBAL PLAY COUNTER - Using counterapi.dev (free & reliable)
+        // GLOBAL PLAY COUNTER - Fresh namespace
         (async function() {
             const countEl = document.getElementById('play-count');
+            
+            // Check if we already counted this session (prevent spam)
+            if (sessionStorage.getItem('counted')) {
+                // Just show the stored count, don't increment again
+                const storedCount = sessionStorage.getItem('playCount') || '1';
+                countEl.textContent = storedCount;
+                return;
+            }
+            
             try {
-                // Increment and get the count
-                const response = await fetch('https://api.counterapi.dev/v1/conversation-game-leo/plays/up');
+                const response = await fetch('https://api.counterapi.dev/v1/leoconvogame2024/globalplays/up');
+                if (!response.ok) throw new Error('API error');
                 const data = await response.json();
                 if (data && data.count !== undefined) {
-                    countEl.textContent = data.count.toLocaleString();
+                    const count = data.count.toLocaleString();
+                    countEl.textContent = count;
+                    sessionStorage.setItem('counted', 'true');
+                    sessionStorage.setItem('playCount', count);
                 } else {
-                    throw new Error('Invalid response');
+                    throw new Error('Bad data');
                 }
-            } catch (e1) {
-                // Backup: Try alternative service
-                try {
-                    const response2 = await fetch('https://api.countapi.xyz/hit/leogame2024/totalplays');
-                    const data2 = await response2.json();
-                    if (data2 && data2.value) {
-                        countEl.textContent = data2.value.toLocaleString();
-                    } else {
-                        countEl.textContent = 'Loading...';
-                    }
-                } catch (e2) {
-                    countEl.textContent = 'Loading...';
-                }
+            } catch (e) {
+                // If API fails, show a fun message instead of broken counter
+                countEl.textContent = '🎮 Many!';
             }
         })();
 
@@ -521,6 +523,17 @@
                 "Spanish": " años!!!",
                 "French": " ans!!!",
                 "Turkish": " yaşındasın!!!"
+            },
+            // === EASTER EGGS ===
+            "Wait a minute you ARE LYING your name cant be 67!!!!!!!!!!!": {
+                "Spanish": "¡Espera un momento, ESTÁS MINTIENDO, tu nombre no puede ser 67!!!!!!!!!!!",
+                "French": "Attends une minute, TU MENS, ton nom ne peut pas être 67!!!!!!!!!!!",
+                "Turkish": "Bir dakika YALAN SÖYLÜYORSUN adın 67 olamaz!!!!!!!!!!!"
+            },
+            "Wait a minute you are 67 YEARS OLD!!!!!!!!!!!": {
+                "Spanish": "¡Espera un momento, tienes 67 AÑOS!!!!!!!!!!!",
+                "French": "Attends une minute, tu as 67 ANS!!!!!!!!!!!",
+                "Turkish": "Bir dakika sen 67 YAŞINDASIN!!!!!!!!!!!"
             },
             "So whats your favorite game? Tag? Mincraft? Pacman? Somthin Else?": {
                 "Spanish": "¿Cuál es tu juego favorito? ¿Pillarse? ¿Minecraft? ¿Pacman? ¿Algo más?",
@@ -993,11 +1006,17 @@
                 this.lastAnswer = await this.askQuestion('Let me get to know you better whats your name?  ');
                 var name = this.lastAnswer;
                 this.writeText('Alright ' + name + '!!!');
+                if (String(name) === '67') {
+                    this.writeText('Wait a minute you ARE LYING your name cant be 67!!!!!!!!!!!');
+                }
                 this.lastAnswer = await this.askQuestion('Now let me get to know your age how old are you?');
                 var age = this.lastAnswer;
                 this.writeText('Awesome You Are ' + age + ' Years Old!!!');
-                this.writeText('You\'re almost older than my great great great great great great great great grandpa XD');
-                this.writeText('Just joking he was a 1000 years old he died a loooong time ago sigh...');
+                if (String(age) === '67') {
+                    this.writeText('Wait a minute you are 67 YEARS OLD!!!!!!!!!!!');
+                    this.writeText('You\'re almost older than my great great great great great great great great grandpa XD');
+                    this.writeText('Just joking he was a 1000 years old he died a loooong time ago sigh...');
+                }
                 this.lastAnswer = await this.askQuestion('I Miss The Old Man 😢  ');
                 this.lastAnswer = await this.askQuestion('Well to get our minds of the topic whats your favorite color?');
                 var color = this.lastAnswer;
