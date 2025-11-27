@@ -1868,28 +1868,29 @@
                         this.writeText('⸸ ' + cursedName + '... T̷H̶E̵ ̴V̷O̶I̵D̴ ̷K̶N̵O̴W̷S̶ ̵Y̴O̷U̶ ⸸');
                         this.lastAnswer = await this.askQuestion('☠ G̷U̶E̵S̴S̷ ̶T̵H̴E̷ ̶N̵U̴M̷B̶E̵R̴ ☠ 1 - 666,666,666,666');
                         var guess = this.lastAnswer;
+                        var voidResult = '"fail"';
                         if (String(guess) === '67') {
+                            var voidResult = '"win"';
                             this.writeText('⛧⛧⛧ I̷M̶P̵O̴S̷S̶I̵B̴L̷E̶ ⛧⛧⛧');
                             this.writeText('░▒▓█ Y̸O̷U̴ H̵A̶V̷E̴ A̵S̶C̷E̴N̵D̶E̷D̴ █▓▒░');
                             this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴ ̷B̶O̵W̴S̷ ̶T̵O̴ ̷Y̶O̵U̴ ☠');
                             this.writeText('⸸ Y̷O̶U̵ ̴K̷N̶O̵W̴ ̷T̶H̵E̴ ̷S̶A̵C̴R̷E̶D̵ ̴N̷U̶M̵B̴E̷R̶... ̵6̴7̷ ⸸');
                         }
-                        this.writeText('⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸');
-                        this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴\'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠');
-                        this.writeText('░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░');
+                        if (String(voidResult) === 'fail') {
+                            this.writeText('⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸');
+                            this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴\'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠');
+                            this.writeText('░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░');
+                        }
+                        this.lastAnswer = await this.askQuestion('⛧ D̷O̶ ̵Y̴O̷U̶ ̵D̴A̷R̶E̵ ̴T̷O̶ ̵C̴O̷N̶T̵I̴N̷U̶E̵? ⛧');
                     }
-                    this.writeText('⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸');
-                    this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴\'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠');
-                    this.writeText('░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░');
+                    this.lastAnswer = await this.askQuestion('Thanks for playing the GUESSING GAME!!! Come back again :D');
+                    await this.beep(523, 200);
+                    await this.beep(659, 200);
+                    await this.beep(784, 200);
+                    await this.beep(1000, 200);
+                    await this.beep(1500, 1000);
+                    return; // Exit the game
                 }
-                this.lastAnswer = await this.askQuestion('⛧ D̷O̶ ̵Y̴O̷U̶ ̵D̴A̷R̶E̵ ̴T̷O̶ ̵C̴O̷N̶T̵I̴N̷U̶E̵? ⛧');
-                this.lastAnswer = await this.askQuestion('Thanks for playing the GUESSING GAME!!! Come back again :D');
-                await this.beep(523, 200);
-                await this.beep(659, 200);
-                await this.beep(784, 200);
-                await this.beep(1000, 200);
-                await this.beep(1500, 1000);
-                return; // Exit the game
                 this.writeText('|================================================================================================================================================================================|');
                 this.writeText(' ');
                 this.writeText(' ');
