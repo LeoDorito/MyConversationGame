@@ -738,6 +738,26 @@
                 "French": "⛧ O̷S̶E̵Z̴-̷V̶O̵U̴S̷ ̶C̵O̴N̷T̶I̵N̴U̷E̶R̵? ⛧",
                 "Turkish": "⛧ D̷E̶V̵A̴M̷ ̶E̵T̴M̷E̶Y̵E̴ ̷C̶E̵S̴A̷R̶E̵T̴ ̷E̶D̵E̴R̷ ̶M̵İ̴S̷İ̶N̵? ⛧"
             },
+            "⸸ Y̷O̶U̵ ̴K̷N̶O̵W̴ ̷T̶H̵E̴ ̷S̶A̵C̴R̷E̶D̵ ̴N̷U̶M̵B̴E̷R̶... ̵6̴7̷ ⸸": {
+                "Spanish": "⸸ C̷O̶N̵O̴C̷E̶S̵ ̴E̷L̶ ̵N̴Ú̷M̶E̵R̴O̷ ̶S̵A̴G̷R̶A̵D̴O̷... ̶6̵7̴ ⸸",
+                "French": "⸸ V̷O̶U̵S̴ ̷C̶O̵N̴N̷A̶I̵S̴S̷E̶Z̵ ̴L̷E̶ ̵N̴O̷M̶B̵R̴E̷ ̶S̵A̴C̷R̶É̵... ̴6̷7̶ ⸸",
+                "Turkish": "⸸ K̷U̶T̵S̴A̷L̶ ̵S̴A̷Y̶I̵Y̴I̷ ̶B̵İ̴L̷İ̶Y̵O̴R̷S̶U̵N̴... ̷6̶7̵ ⸸"
+            },
+            "⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸": {
+                "Spanish": "⸸ C̷U̶A̵N̴D̷O̶ ̵T̴E̷N̶G̵A̴S̷ ̶D̵U̴D̷A̶S̵... ̴D̷I̶ ̵6̴7̷... ⸸",
+                "French": "⸸ E̷N̶ ̵C̴A̷S̶ ̵D̴E̷ ̶D̵O̴U̷T̶E̵... ̴D̷I̶T̵E̴S̷ ̶6̵7̴... ⸸",
+                "Turkish": "⸸ Ş̷Ü̶P̵H̴E̷ ̶D̵U̴Y̷D̶U̵Ğ̴U̷N̶D̵A̴... ̷6̶7̵ ̴D̷E̶... ⸸"
+            },
+            "☠ T̷H̶E̵ ̴V̷O̶I̵D̴'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠": {
+                "Spanish": "☠ E̷L̶ ̵N̴Ú̷M̶E̵R̴O̷ ̶D̵E̴L̷ ̶V̵A̴C̷Í̶O̵ ̴S̷I̶E̵M̴P̷R̶E̵ ̴E̷S̶ ̵6̴7̷ ☠",
+                "French": "☠ L̷E̶ ̵N̴O̷M̶B̵R̴E̷ ̶D̵U̴ ̷V̶I̵D̴E̷ ̶E̵S̴T̷ ̶T̵O̴U̷J̶O̵U̴R̷S̶ ̵6̴7̷ ☠",
+                "Turkish": "☠ B̷O̶Ş̵L̴U̷Ğ̶U̵N̴ ̷S̶A̵Y̴I̷S̶I̵ ̴H̷E̶R̵ ̴Z̷A̶M̵A̴N̷ ̶6̵7̴ ☠"
+            },
+            "░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░": {
+                "Spanish": "░▒▓ H̸A̷S̴ F̵A̶L̷L̴A̵D̶O̷ A̴L̵ V̶A̷C̴Í̵O̶ ▓▒░",
+                "French": "░▒▓ V̸O̷U̴S̵ A̶V̷E̴Z̵ É̶C̷H̴O̵U̶É̷ A̴U̵ V̶I̷D̴E̵ ▓▒░",
+                "Turkish": "░▒▓ B̸O̷Ş̴L̵U̶Ğ̷A̴ K̵A̶Y̷B̴E̵T̶T̷İ̴N̵ ▓▒░"
+            },
             // === NORMAL MODE ===
             "Time For Normal Mode! ": {
                 "Spanish": "¡Es hora del Modo Normal!",
@@ -1846,32 +1866,30 @@
                         this.lastAnswer = await this.askQuestion('̷̧W̶̡H̵̢A̴̧T̷̨ ̶̧I̵̢Ş̴ ̷̨Y̶̧O̵̢U̴̧R̷̨ ̶̧N̵̢A̴̧M̷̨Ȩ̶?̵̢');
                         var cursedName = this.lastAnswer;
                         this.writeText('⸸ ' + cursedName + '... T̷H̶E̵ ̴V̷O̶I̵D̴ ̷K̶N̵O̴W̷S̶ ̵Y̴O̷U̶ ⸸');
-                        this.lastAnswer = String(Math.floor(Math.random() * (666666666666 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
                         this.lastAnswer = await this.askQuestion('☠ G̷U̶E̵S̴S̷ ̶T̵H̴E̷ ̶N̵U̴M̷B̶E̵R̴ ☠ 1 - 666,666,666,666');
                         var guess = this.lastAnswer;
                         if (String(guess) === '67') {
                             this.writeText('⛧⛧⛧ I̷M̶P̵O̴S̷S̶I̵B̴L̷E̶ ⛧⛧⛧');
                             this.writeText('░▒▓█ Y̸O̷U̴ H̵A̶V̷E̴ A̵S̶C̷E̴N̵D̶E̷D̴ █▓▒░');
                             this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴ ̷B̶O̵W̴S̷ ̶T̵O̴ ̷Y̶O̵U̴ ☠');
+                            this.writeText('⸸ Y̷O̶U̵ ̴K̷N̶O̵W̴ ̷T̶H̵E̴ ̷S̶A̵C̴R̷E̶D̵ ̴N̷U̶M̵B̴E̷R̶... ̵6̴7̷ ⸸');
                         }
-                        if (parseInt(guess) < parseInt(secretNumber)) {
-                            this.writeText('⸸ T̷O̶O̵ ̴L̷O̶W̵... ̴T̷H̶E̵ ̴V̷O̶I̵D̴ ̷C̶O̵N̴S̷U̶M̵E̴S̷ ̶Y̵O̴U̷ ⸸');
-                        }
-                        if (parseInt(guess) > parseInt(secretNumber)) {
-                            this.writeText('⸸ T̷O̶O̵ ̴H̷I̶G̵H̴... ̷Y̶O̵U̴ ̷A̶R̵E̴ ̷L̶O̵S̴T̷ ̶I̵N̴ ̷T̶H̵E̴ ̷V̶O̵I̴D̷ ⸸');
-                        }
-                        this.writeText('☠ T̷H̶E̵ ̴S̷E̶C̵R̴E̷T̶ ̵N̴U̷M̶B̵E̴R̷ ̶W̵A̴S̷... ' + secretNumber + ' ☠');
-                        this.lastAnswer = await this.askQuestion('⛧ D̷O̶ ̵Y̴O̷U̶ ̵D̴A̷R̶E̵ ̴T̷O̶ ̵C̴O̷N̶T̵I̴N̷U̶E̵? ⛧');
+                        this.writeText('⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸');
+                        this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴\'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠');
+                        this.writeText('░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░');
                     }
-                    this.lastAnswer = await this.askQuestion('Thanks for playing the GUESSING GAME!!! Come back again :D');
-                    await this.beep(523, 200);
-                    await this.beep(659, 200);
-                    await this.beep(784, 200);
-                    await this.beep(1000, 200);
-                    await this.beep(1500, 1000);
-                    return; // Exit the game
+                    this.writeText('⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸');
+                    this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴\'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠');
+                    this.writeText('░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░');
                 }
+                this.lastAnswer = await this.askQuestion('⛧ D̷O̶ ̵Y̴O̷U̶ ̵D̴A̷R̶E̵ ̴T̷O̶ ̵C̴O̷N̶T̵I̴N̷U̶E̵? ⛧');
+                this.lastAnswer = await this.askQuestion('Thanks for playing the GUESSING GAME!!! Come back again :D');
+                await this.beep(523, 200);
+                await this.beep(659, 200);
+                await this.beep(784, 200);
+                await this.beep(1000, 200);
+                await this.beep(1500, 1000);
+                return; // Exit the game
                 this.writeText('|================================================================================================================================================================================|');
                 this.writeText(' ');
                 this.writeText(' ');
