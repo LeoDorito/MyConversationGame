@@ -1,4 +1,202 @@
-<!DOCTYPE html>
+#!/usr/bin/env python3
+"""
+LeoToWEB.py - Convert Leo.mylang to Leo_WEB.html
+Completely rewritten with proper block tracking
+"""
+
+import re
+import os
+
+def convert_mylang_to_web():
+    with open('Leo.mylang', 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    js_game_code = generate_js_game_code(lines)
+    html_content = generate_html(js_game_code)
+    
+    with open('Leo_WEB.html', 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    os.makedirs('website_upload', exist_ok=True)
+    with open('website_upload/index.html', 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    print("SUCCESS! Created Leo_WEB.html")
+    print("Also updated website_upload/index.html for Netlify!")
+
+def escape_js(text):
+    """Escape text for JavaScript string"""
+    return text.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
+
+def generate_js_game_code(lines):
+    """Convert Leo.mylang lines to JavaScript game code"""
+    js_lines = []
+    indent_level = 0  # Track how deep we are in blocks
+    
+    def indent():
+        return '                ' + ('    ' * indent_level)
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # Skip empty lines and comments
+        if not stripped or stripped.startswith('Comment:'):
+            continue
+        
+        # Handle End FIRST (before other commands) to properly close blocks
+        if stripped == 'End' or stripped == 'End ':
+            if indent_level > 0:
+                indent_level -= 1
+                js_lines.append(f"{indent()}}}")
+            continue
+        
+        # Write command starting with string: Write "text"
+        if stripped.startswith('Write "') and stripped.endswith('"'):
+            text = stripped[7:-1]
+            # Handle string concatenation like "text" + var + "more"
+            if '" + ' in text:
+                parts = text.split('" + ')
+                result = f"'{escape_js(parts[0])}'"
+                for part in parts[1:]:
+                    if part.endswith(' + "'):
+                        var = part[:-4]
+                        result += f" + {var} + "
+                    elif ' + "' in part:
+                        idx = part.index(' + "')
+                        var = part[:idx]
+                        rest = part[idx+4:]
+                        result += f" + {var} + '{escape_js(rest)}'"
+                    else:
+                        result += f" + {part}"
+                js_lines.append(f"{indent()}this.writeText({result});")
+            else:
+                js_lines.append(f"{indent()}this.writeText('{escape_js(text)}');")
+        
+        # Write command starting with variable: Write var + "text" or Write var +"text"
+        elif stripped.startswith('Write ') and ('+' in stripped) and not stripped.startswith('Write "'):
+            # Normalize: add spaces around + if missing
+            content = stripped[6:].replace('+', ' + ')
+            # Remove double spaces
+            while '  ' in content:
+                content = content.replace('  ', ' ')
+            parts = content.split(' + ')
+            result = ""
+            for i, part in enumerate(parts):
+                part = part.strip()
+                if part.startswith('"') and part.endswith('"'):
+                    result += f"'{escape_js(part[1:-1])}'"
+                elif part.startswith('"'):
+                    result += f"'{escape_js(part[1:])}'"
+                elif part.endswith('"'):
+                    result += f"'{escape_js(part[:-1])}'"
+                else:
+                    result += part
+                if i < len(parts) - 1:
+                    result += " + "
+            js_lines.append(f"{indent()}this.writeText({result});")
+        
+        # WriteRaw command
+        elif stripped.startswith('WriteRaw "') and stripped.endswith('"'):
+            text = stripped[10:-1]
+            js_lines.append(f"{indent()}this.writeText('{escape_js(text)}');")
+        
+        # Ask command
+        elif stripped.startswith('Ask "') and stripped.endswith('"'):
+            text = stripped[5:-1]
+            js_lines.append(f"{indent()}this.lastAnswer = await this.askQuestion('{escape_js(text)}');")
+        
+        # Save command
+        elif stripped.startswith('Save ') and ' = ' in stripped:
+            match = re.search(r'Save (\w+) = (.+)', stripped)
+            if match:
+                var_name = match.group(1)
+                value = match.group(2).strip()
+                if value == 'answer':
+                    js_lines.append(f"{indent()}var {var_name} = this.lastAnswer;")
+                else:
+                    js_lines.append(f"{indent()}var {var_name} = '{value}';")
+        
+        # Choose command
+        elif stripped.startswith('Choose "'):
+            parts = re.findall(r'"([^"]*)"', stripped)
+            if len(parts) >= 2:
+                question = escape_js(parts[0])
+                options = [escape_js(opt) for opt in parts[1:]]
+                options_str = ', '.join([f"'{opt}'" for opt in options])
+                js_lines.append(f"{indent()}this.lastAnswer = await this.showChoices('{question}', [{options_str}]);")
+        
+        # Random command
+        elif stripped.startswith('Random '):
+            match = re.search(r'Random (\d+) (\d+)', stripped)
+            if match:
+                min_val = match.group(1)
+                max_val = match.group(2)
+                js_lines.append(f"{indent()}this.lastAnswer = String(Math.floor(Math.random() * ({max_val} - {min_val} + 1)) + {min_val});")
+        
+        # Beep command
+        elif stripped.startswith('Beep '):
+            match = re.search(r'Beep (\d+) (\d+)', stripped)
+            if match:
+                freq = match.group(1)
+                duration = match.group(2)
+                js_lines.append(f"{indent()}await this.beep({freq}, {duration});")
+        
+        # Exit command
+        elif stripped == 'Exit':
+            js_lines.append(f"{indent()}return; // Exit the game")
+        
+        # Repeat command
+        elif stripped.startswith('Repeat ') and 'times:' in stripped:
+            match = re.search(r'Repeat (\d+) times:', stripped)
+            if match:
+                count = min(int(match.group(1)), 100)
+                js_lines.append(f"{indent()}for (var _i = 0; _i < {count}; _i++) {{")
+                indent_level += 1
+        
+        # If equals command with quoted string
+        elif stripped.startswith('If ') and ' equals "' in stripped and stripped.endswith(':'):
+            match = re.search(r'If (\w+) equals "([^"]+)":', stripped)
+            if match:
+                var_name = match.group(1)
+                value = match.group(2)
+                js_lines.append(f"{indent()}if (String({var_name}) === '{escape_js(value)}') {{")
+                indent_level += 1
+        
+        # If equals command with variable (no quotes)
+        elif stripped.startswith('If ') and ' equals ' in stripped and stripped.endswith(':') and '"' not in stripped.split(' equals ')[1]:
+            match = re.search(r'If (\w+) equals (\w+):', stripped)
+            if match:
+                var_name = match.group(1)
+                other_var = match.group(2)
+                js_lines.append(f"{indent()}if (String({var_name}) === String({other_var})) {{")
+                indent_level += 1
+        
+        # If greater than command (supports both variables and quoted strings)
+        elif stripped.startswith('If ') and ' greater than ' in stripped and stripped.endswith(':'):
+            match = re.search(r'If (\w+) greater than ["\']?([^"\':\s]+)["\']?:', stripped)
+            if not match:
+                match = re.search(r'If (\w+) greater than "([^"]+)":', stripped)
+            if match:
+                var1 = match.group(1)
+                var2 = match.group(2)
+                js_lines.append(f"{indent()}if (parseInt({var1}) > parseInt('{var2}')) {{")
+                indent_level += 1
+        
+        # If less than command (supports both variables and quoted strings)
+        elif stripped.startswith('If ') and ' less than ' in stripped and stripped.endswith(':'):
+            match = re.search(r'If (\w+) less than ["\']?([^"\':\s]+)["\']?:', stripped)
+            if not match:
+                match = re.search(r'If (\w+) less than "([^"]+)":', stripped)
+            if match:
+                var1 = match.group(1)
+                var2 = match.group(2)
+                js_lines.append(f"{indent()}if (parseInt({var1}) < parseInt('{var2}')) {{")
+                indent_level += 1
+    
+    return '\n'.join(js_lines)
+
+def generate_html(js_game_code):
+    return '''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -27,10 +225,11 @@
             to { text-shadow: 0 0 30px #00ff88, 0 0 60px #00ff88, 0 0 80px #00ff88; }
         }
         .game-container {
-            width: 98%; max-width: 1400px;
+            width: 98%; max-width: 1200px;
             background: rgba(22, 33, 62, 0.95);
             border: 2px solid #00ff88; border-radius: 15px;
             box-shadow: 0 0 30px rgba(0, 255, 136, 0.3); overflow: hidden;
+            margin-right: 180px;
         }
         #text-area {
             height: 550px; overflow-y: auto; overflow-x: auto; padding: 20px;
@@ -86,9 +285,89 @@
             border: 1px solid #ffcc00;
             border-radius: 20px;
         }
+        .side-panel {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 1000;
+        }
+        .side-btn {
+            padding: 15px 25px;
+            font-size: 14px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #ff6b6b;
+            background: rgba(22, 33, 62, 0.95);
+            transition: all 0.3s ease;
+            text-align: center;
+            min-width: 120px;
+        }
+        .side-btn:hover {
+            transform: scale(1.05);
+            background: #ff6b6b;
+            color: #0a0a1a;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+        .timer-display {
+            padding: 15px 25px;
+            font-size: 18px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            color: #00ffff;
+            background: rgba(22, 33, 62, 0.95);
+            text-align: center;
+            min-width: 120px;
+            display: none;
+        }
+        .timer-display.active {
+            display: block;
+            animation: timerPulse 1s ease-in-out infinite;
+        }
+        @keyframes timerPulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(0, 255, 255, 0.6); }
+        }
+        .timer-label {
+            font-size: 10px;
+            color: #00ffff;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        .timer-value {
+            font-size: 24px;
+        }
+        @media (max-width: 1400px) {
+            .side-panel {
+                position: static;
+                transform: none;
+                flex-direction: row;
+                justify-content: center;
+                margin-bottom: 15px;
+            }
+            .game-container {
+                margin-right: 0;
+                max-width: 1400px;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="side-panel">
+        <button class="side-btn" id="restart-btn" onclick="location.reload()">🔄 Restart</button>
+        <div class="timer-display" id="timer-display">
+            <div class="timer-label" id="timer-label">⏱️ Timer</div>
+            <div class="timer-value" id="timer-value">00:00</div>
+        </div>
+    </div>
     <h1 class="title">🎮 THE CONVERSATION GAME 🎮</h1>
     <div class="play-counter">🌍 Global Plays: <span id="play-count">...</span></div>
     <div class="game-container">
@@ -130,6 +409,92 @@
             }
         })();
 
+        // TIMER SYSTEM for Time Attack mode
+        const gameTimer = {
+            startTime: null,
+            intervalId: null,
+            isRunning: false,
+            
+            start: function() {
+                if (this.isRunning) return;
+                this.startTime = Date.now();
+                this.isRunning = true;
+                document.getElementById('timer-display').classList.add('active');
+                this.intervalId = setInterval(() => this.update(), 100);
+            },
+            
+            stop: function() {
+                if (!this.isRunning) return;
+                this.isRunning = false;
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                }
+            },
+            
+            hide: function() {
+                this.stop();
+                document.getElementById('timer-display').classList.remove('active');
+            },
+            
+            update: function() {
+                if (!this.startTime) return;
+                const elapsed = Date.now() - this.startTime;
+                const seconds = Math.floor(elapsed / 1000);
+                const ms = Math.floor((elapsed % 1000) / 10);
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                document.getElementById('timer-value').textContent = 
+                    String(mins).padStart(2, '0') + ':' + 
+                    String(secs).padStart(2, '0') + '.' + 
+                    String(ms).padStart(2, '0');
+            },
+            
+            getTime: function() {
+                if (!this.startTime) return '00:00.00';
+                const elapsed = Date.now() - this.startTime;
+                const seconds = Math.floor(elapsed / 1000);
+                const ms = Math.floor((elapsed % 1000) / 10);
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return String(mins).padStart(2, '0') + ':' + 
+                       String(secs).padStart(2, '0') + '.' + 
+                       String(ms).padStart(2, '0');
+            }
+        };
+        
+        // UI Text translations for side panel
+        const uiTranslations = {
+            "🔄 Restart": {
+                "Spanish": "🔄 Reiniciar",
+                "French": "🔄 Recommencer",
+                "Turkish": "🔄 Yeniden Başlat"
+            },
+            "⏱️ Timer": {
+                "Spanish": "⏱️ Cronómetro",
+                "French": "⏱️ Chrono",
+                "Turkish": "⏱️ Zamanlayıcı"
+            }
+        };
+        
+        // Function to update UI elements based on language
+        function updateUILanguage(lang) {
+            const restartBtn = document.getElementById('restart-btn');
+            const timerLabel = document.getElementById('timer-label');
+            
+            if (lang && lang !== 'English') {
+                if (uiTranslations["🔄 Restart"][lang]) {
+                    restartBtn.textContent = uiTranslations["🔄 Restart"][lang];
+                }
+                if (uiTranslations["⏱️ Timer"][lang]) {
+                    timerLabel.textContent = uiTranslations["⏱️ Timer"][lang];
+                }
+            } else {
+                restartBtn.textContent = "🔄 Restart";
+                timerLabel.textContent = "⏱️ Timer";
+            }
+        }
+
         // TRANSLATION SYSTEM - All game text in 4 languages
         const translations = {
             // === WELCOME & INSTRUCTIONS ===
@@ -164,10 +529,10 @@
                 "French": "Il y a aussi des jeux de devinettes où je pense à un nombre et vous essayez de le deviner! Je pense à un nombre 1-2. Devinez!",
                 "Turkish": "Ayrıca benim bir sayı düşündüğüm ve senin tahmin etmeye çalıştığın tahmin oyunları var! 1-2 arasında bir sayı düşünüyorum. Tahmin et!"
             },
-            "NICE JOB!  \\(*o*)/": {
-                "Spanish": "¡BUEN TRABAJO! \\(*o*)/",
-                "French": "BON TRAVAIL! \\(*o*)/",
-                "Turkish": "GÜZEL İŞ! \\(*o*)/"
+            "NICE JOB!  \\\\(*o*)/": {
+                "Spanish": "¡BUEN TRABAJO! \\\\(*o*)/",
+                "French": "BON TRAVAIL! \\\\(*o*)/",
+                "Turkish": "GÜZEL İŞ! \\\\(*o*)/"
             },
             "Too high! Try again next time! :D": {
                 "Spanish": "¡Muy alto! ¡Inténtalo de nuevo la próxima vez! :D",
@@ -251,10 +616,10 @@
                 "French": "Normal",
                 "Turkish": "Normal"
             },
-            "You begin your adventure where shall you begin? Numbers next to the areas mean the difficulty. 1 is easiest, 10 is hardest.If your game is over reload the page to restart!": {
-                "Spanish": "Comienzas tu aventura, ¿dónde empezarás? Los números junto a las áreas indican la dificultad. 1 es fácil, 10 es difícil. ¡Si pierdes, recarga la página!",
-                "French": "Tu commences ton aventure, où vas-tu commencer? Les numéros indiquent la difficulté. 1 est facile, 10 est difficile. Si tu perds, recharge la page!",
-                "Turkish": "Macerana başlıyorsun, nereden başlayacaksın? Numaralar zorluğu gösterir. 1 kolay, 10 zor. Oyun biterse sayfayı yenile!"
+            "You begin your adventure where shall you begin? Numbers next to the areas mean the difficulty. 1 is easiest, 10 is hardest. If your game is over press the Restart button!": {
+                "Spanish": "Comienzas tu aventura, ¿dónde empezarás? Los números junto a las áreas indican la dificultad. 1 es fácil, 10 es difícil. ¡Si pierdes, presiona el botón Reiniciar!",
+                "French": "Tu commences ton aventure, où vas-tu commencer? Les numéros indiquent la difficulté. 1 est facile, 10 est difficile. Si tu perds, appuie sur Recommencer!",
+                "Turkish": "Macerana başlıyorsun, nereden başlayacaksın? Numaralar zorluğu gösterir. 1 kolay, 10 zor. Oyun biterse Yeniden Başlat butonuna bas!"
             },
             "|1| Village": {
                 "Spanish": "|1| Aldea",
@@ -511,15 +876,15 @@
                 "French": "Tu as terminé ton Aventure! Quel chemin choisiras-tu ensuite?",
                 "Turkish": "Maceranı tamamladın! Sırada hangi yolu seçeceksin?"
             },
-            "Reload to Start from the beginning! :D": {
-                "Spanish": "¡Recarga para empezar desde el principio! :D",
-                "French": "Recharge pour recommencer depuis le début! :D",
-                "Turkish": "Baştan başlamak için sayfayı yenile! :D"
+            "Press the Restart button to start from the beginning! :D": {
+                "Spanish": "¡Presiona el botón Reiniciar para empezar desde el principio! :D",
+                "French": "Appuie sur Recommencer pour revenir au début! :D",
+                "Turkish": "Baştan başlamak için Yeniden Başlat butonuna bas! :D"
             },
-            "Reload to Restart!": {
-                "Spanish": "¡Recarga para Reiniciar!",
-                "French": "Recharge pour Redémarrer!",
-                "Turkish": "Yeniden Başlamak İçin Yenile!"
+            "Press the Restart button to play again!": {
+                "Spanish": "¡Presiona el botón Reiniciar para jugar de nuevo!",
+                "French": "Appuie sur Recommencer pour rejouer!",
+                "Turkish": "Tekrar oynamak için Yeniden Başlat butonuna bas!"
             },
             // === ADVENTURE NORMAL MODE ===
             "You embark on your adventure choose a difficulty!": {
@@ -527,10 +892,10 @@
                 "French": "Tu te lances dans ton aventure, choisis une difficulté!",
                 "Turkish": "Macerana çıkıyorsun, zorluk seç!"
             },
-            "You begin your adventure! Numbers mean difficulty (1=easiest, 10=hardest). Reload if you lose!": {
-                "Spanish": "¡Comienzas tu aventura! Los números indican dificultad (1=fácil, 10=difícil). ¡Recarga si pierdes!",
-                "French": "Tu commences ton aventure! Les numéros indiquent la difficulté (1=facile, 10=difficile). Recharge si tu perds!",
-                "Turkish": "Macerana başlıyorsun! Numaralar zorluğu gösterir (1=kolay, 10=zor). Kaybedersen yenile!"
+            "You begin your adventure! Numbers mean difficulty 1 is easiest 10 is hardest. Press Restart if you lose!": {
+                "Spanish": "¡Comienzas tu aventura! Los números indican dificultad 1 es fácil 10 es difícil. ¡Presiona Reiniciar si pierdes!",
+                "French": "Tu commences ton aventure! Les numéros indiquent la difficulté 1 est facile 10 est difficile. Appuie sur Recommencer si tu perds!",
+                "Turkish": "Macerana başlıyorsun! Numaralar zorluğu gösterir 1 kolay 10 zor. Kaybedersen Yeniden Başlat'a bas!"
             },
             "|3| Carnival": {
                 "Spanish": "|3| Carnaval",
@@ -1499,10 +1864,1337 @@
                 "French": "Tu as complété le mode Albert Einstein! Tu es officiellement un génie!",
                 "Turkish": "Albert Einstein modunu tamamladın! Resmi olarak bir dahisin!"
             },
+            // === RIDDLES MODE ===
+            "Riddles!": {
+                "Spanish": "¡Acertijos!",
+                "French": "Devinettes!",
+                "Turkish": "Bilmeceler!"
+            },
+            "Pick a puzzle type!": {
+                "Spanish": "¡Elige un tipo de rompecabezas!",
+                "French": "Choisis un type de puzzle!",
+                "Turkish": "Bir bulmaca türü seç!"
+            },
+            "Welcome to Riddles! How tricky do you want them?": {
+                "Spanish": "¡Bienvenido a los Acertijos! ¿Qué tan difíciles los quieres?",
+                "French": "Bienvenue aux Devinettes! Tu les veux à quel niveau?",
+                "Turkish": "Bilmecelere Hoşgeldin! Ne kadar zor olsunlar?"
+            },
+            "|1| Easy": {
+                "Spanish": "|1| Fácil",
+                "French": "|1| Facile",
+                "Turkish": "|1| Kolay"
+            },
+            "|2| Medium": {
+                "Spanish": "|2| Medio",
+                "French": "|2| Moyen",
+                "Turkish": "|2| Orta"
+            },
+            "|3| Hard": {
+                "Spanish": "|3| Difícil",
+                "French": "|3| Difficile",
+                "Turkish": "|3| Zor"
+            },
+            "|4| Expert": {
+                "Spanish": "|4| Experto",
+                "French": "|4| Expert",
+                "Turkish": "|4| Uzman"
+            },
+            "Easy Riddles - Perfect for beginners!": {
+                "Spanish": "Acertijos Fáciles - ¡Perfectos para principiantes!",
+                "French": "Devinettes Faciles - Parfait pour les débutants!",
+                "Turkish": "Kolay Bilmeceler - Yeni başlayanlar için mükemmel!"
+            },
+            "Riddle 1: What has hands but cannot clap?": {
+                "Spanish": "Acertijo 1: ¿Qué tiene manos pero no puede aplaudir?",
+                "French": "Devinette 1: Qu'est-ce qui a des mains mais ne peut pas applaudir?",
+                "Turkish": "Bilmece 1: Elleri var ama alkışlayamaz. Nedir?"
+            },
+            "A clock": {
+                "Spanish": "Un reloj",
+                "French": "Une horloge",
+                "Turkish": "Bir saat"
+            },
+            "A robot": {
+                "Spanish": "Un robot",
+                "French": "Un robot",
+                "Turkish": "Bir robot"
+            },
+            "A statue": {
+                "Spanish": "Una estatua",
+                "French": "Une statue",
+                "Turkish": "Bir heykel"
+            },
+            "A tree": {
+                "Spanish": "Un árbol",
+                "French": "Un arbre",
+                "Turkish": "Bir ağaç"
+            },
+            "Correct! A clock has hands but cannot clap!": {
+                "Spanish": "¡Correcto! ¡Un reloj tiene manecillas pero no puede aplaudir!",
+                "French": "Correct! Une horloge a des aiguilles mais ne peut pas applaudir!",
+                "Turkish": "Doğru! Saatin kolları var ama alkışlayamaz!"
+            },
+            "Nope! Robots can actually clap. The answer was: A clock!": {
+                "Spanish": "¡No! Los robots pueden aplaudir. ¡La respuesta era: Un reloj!",
+                "French": "Non! Les robots peuvent applaudir. La réponse était: Une horloge!",
+                "Turkish": "Hayır! Robotlar alkışlayabilir. Cevap: Bir saat!"
+            },
+            "Nope! The answer was: A clock!": {
+                "Spanish": "¡No! ¡La respuesta era: Un reloj!",
+                "French": "Non! La réponse était: Une horloge!",
+                "Turkish": "Hayır! Cevap: Bir saat!"
+            },
+            "Nope! Trees have branches not hands. The answer was: A clock!": {
+                "Spanish": "¡No! Los árboles tienen ramas no manos. ¡La respuesta era: Un reloj!",
+                "French": "Non! Les arbres ont des branches pas des mains. La réponse était: Une horloge!",
+                "Turkish": "Hayır! Ağaçların dalları var elleri değil. Cevap: Bir saat!"
+            },
+            "Riddle 2: What has a head and a tail but no body?": {
+                "Spanish": "Acertijo 2: ¿Qué tiene cabeza y cola pero no tiene cuerpo?",
+                "French": "Devinette 2: Qu'est-ce qui a une tête et une queue mais pas de corps?",
+                "Turkish": "Bilmece 2: Başı ve kuyruğu var ama gövdesi yok. Nedir?"
+            },
+            "A snake": {
+                "Spanish": "Una serpiente",
+                "French": "Un serpent",
+                "Turkish": "Bir yılan"
+            },
+            "A coin": {
+                "Spanish": "Una moneda",
+                "French": "Une pièce",
+                "Turkish": "Bir madeni para"
+            },
+            "A worm": {
+                "Spanish": "Un gusano",
+                "French": "Un ver",
+                "Turkish": "Bir solucan"
+            },
+            "A lizard": {
+                "Spanish": "Un lagarto",
+                "French": "Un lézard",
+                "Turkish": "Bir kertenkele"
+            },
+            "Correct! A coin has heads and tails but no body!": {
+                "Spanish": "¡Correcto! ¡Una moneda tiene cara y cruz pero no cuerpo!",
+                "French": "Correct! Une pièce a pile et face mais pas de corps!",
+                "Turkish": "Doğru! Madeni paranın yazı ve turası var ama gövdesi yok!"
+            },
+            "Nope! Snakes have bodies. The answer was: A coin!": {
+                "Spanish": "¡No! Las serpientes tienen cuerpo. ¡La respuesta era: Una moneda!",
+                "French": "Non! Les serpents ont un corps. La réponse était: Une pièce!",
+                "Turkish": "Hayır! Yılanların gövdesi var. Cevap: Bir madeni para!"
+            },
+            "Nope! The answer was: A coin!": {
+                "Spanish": "¡No! ¡La respuesta era: Una moneda!",
+                "French": "Non! La réponse était: Une pièce!",
+                "Turkish": "Hayır! Cevap: Bir madeni para!"
+            },
+            "Riddle 3: What gets wetter the more it dries?": {
+                "Spanish": "Acertijo 3: ¿Qué se moja más mientras más seca?",
+                "French": "Devinette 3: Qu'est-ce qui devient plus mouillé en séchant?",
+                "Turkish": "Bilmece 3: Kuruladıkça daha çok ıslanan nedir?"
+            },
+            "A sponge": {
+                "Spanish": "Una esponja",
+                "French": "Une éponge",
+                "Turkish": "Bir sünger"
+            },
+            "A towel": {
+                "Spanish": "Una toalla",
+                "French": "Une serviette",
+                "Turkish": "Bir havlu"
+            },
+            "The sun": {
+                "Spanish": "El sol",
+                "French": "Le soleil",
+                "Turkish": "Güneş"
+            },
+            "Sand": {
+                "Spanish": "Arena",
+                "French": "Sable",
+                "Turkish": "Kum"
+            },
+            "Correct! A towel gets wetter as it dries you off!": {
+                "Spanish": "¡Correcto! ¡Una toalla se moja más mientras te seca!",
+                "French": "Correct! Une serviette devient plus mouillée en te séchant!",
+                "Turkish": "Doğru! Havlu seni kuruladıkça daha çok ıslanır!"
+            },
+            "Close but no! The answer was: A towel!": {
+                "Spanish": "¡Cerca pero no! ¡La respuesta era: Una toalla!",
+                "French": "Proche mais non! La réponse était: Une serviette!",
+                "Turkish": "Yaklaştın ama hayır! Cevap: Bir havlu!"
+            },
+            "Nope! The answer was: A towel!": {
+                "Spanish": "¡No! ¡La respuesta era: Una toalla!",
+                "French": "Non! La réponse était: Une serviette!",
+                "Turkish": "Hayır! Cevap: Bir havlu!"
+            },
+            "You completed Easy Riddles! Try Medium next!": {
+                "Spanish": "¡Completaste los Acertijos Fáciles! ¡Prueba Medio después!",
+                "French": "Tu as complété les Devinettes Faciles! Essaie Moyen ensuite!",
+                "Turkish": "Kolay Bilmeceleri tamamladın! Sonra Orta seviyeyi dene!"
+            },
+            "Medium Riddles - Time to think a bit harder!": {
+                "Spanish": "Acertijos Medios - ¡Hora de pensar un poco más!",
+                "French": "Devinettes Moyennes - Il est temps de réfléchir un peu plus!",
+                "Turkish": "Orta Bilmeceler - Biraz daha düşünme zamanı!"
+            },
+            "Riddle 1: I speak without a mouth and hear without ears. I have no body but come alive with wind. What am I?": {
+                "Spanish": "Acertijo 1: Hablo sin boca y oigo sin oídos. No tengo cuerpo pero cobro vida con el viento. ¿Qué soy?",
+                "French": "Devinette 1: Je parle sans bouche et entends sans oreilles. Je n'ai pas de corps mais je prends vie avec le vent. Que suis-je?",
+                "Turkish": "Bilmece 1: Ağzım olmadan konuşurum ve kulaklarım olmadan duyarım. Gövdem yok ama rüzgarla hayat bulurum. Neyim?"
+            },
+            "A ghost": {
+                "Spanish": "Un fantasma",
+                "French": "Un fantôme",
+                "Turkish": "Bir hayalet"
+            },
+            "An echo": {
+                "Spanish": "Un eco",
+                "French": "Un écho",
+                "Turkish": "Bir yankı"
+            },
+            "A whisper": {
+                "Spanish": "Un susurro",
+                "French": "Un murmure",
+                "Turkish": "Bir fısıltı"
+            },
+            "A dream": {
+                "Spanish": "Un sueño",
+                "French": "Un rêve",
+                "Turkish": "Bir rüya"
+            },
+            "Correct! An echo speaks and hears without a body!": {
+                "Spanish": "¡Correcto! ¡Un eco habla y escucha sin cuerpo!",
+                "French": "Correct! Un écho parle et entend sans corps!",
+                "Turkish": "Doğru! Yankı gövdesiz konuşur ve duyar!"
+            },
+            "Spooky guess but no! The answer was: An echo!": {
+                "Spanish": "¡Buen intento escalofriante pero no! ¡La respuesta era: Un eco!",
+                "French": "Réponse effrayante mais non! La réponse était: Un écho!",
+                "Turkish": "Ürkütücü tahmin ama hayır! Cevap: Bir yankı!"
+            },
+            "Close but no! The answer was: An echo!": {
+                "Spanish": "¡Cerca pero no! ¡La respuesta era: Un eco!",
+                "French": "Proche mais non! La réponse était: Un écho!",
+                "Turkish": "Yaklaştın ama hayır! Cevap: Bir yankı!"
+            },
+            "Nope! The answer was: An echo!": {
+                "Spanish": "¡No! ¡La respuesta era: Un eco!",
+                "French": "Non! La réponse était: Un écho!",
+                "Turkish": "Hayır! Cevap: Bir yankı!"
+            },
+            "Riddle 2: The more you take the more you leave behind. What am I?": {
+                "Spanish": "Acertijo 2: Cuanto más tomas más dejas atrás. ¿Qué soy?",
+                "French": "Devinette 2: Plus tu en prends plus tu en laisses. Que suis-je?",
+                "Turkish": "Bilmece 2: Ne kadar çok alırsan o kadar çok geride bırakırsın. Neyim?"
+            },
+            "Footsteps": {
+                "Spanish": "Pasos",
+                "French": "Des pas",
+                "Turkish": "Ayak izleri"
+            },
+            "Breaths": {
+                "Spanish": "Respiraciones",
+                "French": "Des respirations",
+                "Turkish": "Nefesler"
+            },
+            "Photos": {
+                "Spanish": "Fotos",
+                "French": "Des photos",
+                "Turkish": "Fotoğraflar"
+            },
+            "Money": {
+                "Spanish": "Dinero",
+                "French": "De l'argent",
+                "Turkish": "Para"
+            },
+            "Correct! Footsteps are left behind as you walk!": {
+                "Spanish": "¡Correcto! ¡Los pasos quedan atrás mientras caminas!",
+                "French": "Correct! Les pas restent derrière toi quand tu marches!",
+                "Turkish": "Doğru! Yürürken ayak izleri geride kalır!"
+            },
+            "Nope! The answer was: Footsteps!": {
+                "Spanish": "¡No! ¡La respuesta era: Pasos!",
+                "French": "Non! La réponse était: Des pas!",
+                "Turkish": "Hayır! Cevap: Ayak izleri!"
+            },
+            "Riddle 3: I have cities but no houses. I have mountains but no trees. I have water but no fish. What am I?": {
+                "Spanish": "Acertijo 3: Tengo ciudades pero no casas. Tengo montañas pero no árboles. Tengo agua pero no peces. ¿Qué soy?",
+                "French": "Devinette 3: J'ai des villes mais pas de maisons. J'ai des montagnes mais pas d'arbres. J'ai de l'eau mais pas de poissons. Que suis-je?",
+                "Turkish": "Bilmece 3: Şehirlerim var ama evlerim yok. Dağlarım var ama ağaçlarım yok. Suyum var ama balıklarım yok. Neyim?"
+            },
+            "A painting": {
+                "Spanish": "Una pintura",
+                "French": "Une peinture",
+                "Turkish": "Bir tablo"
+            },
+            "A map": {
+                "Spanish": "Un mapa",
+                "French": "Une carte",
+                "Turkish": "Bir harita"
+            },
+            "A photograph": {
+                "Spanish": "Una fotografía",
+                "French": "Une photographie",
+                "Turkish": "Bir fotoğraf"
+            },
+            "Correct! A map has all these things but not really!": {
+                "Spanish": "¡Correcto! ¡Un mapa tiene todo esto pero no de verdad!",
+                "French": "Correct! Une carte a tout ça mais pas vraiment!",
+                "Turkish": "Doğru! Haritada bunların hepsi var ama gerçek değil!"
+            },
+            "Creative but no! The answer was: A map!": {
+                "Spanish": "¡Creativo pero no! ¡La respuesta era: Un mapa!",
+                "French": "Créatif mais non! La réponse était: Une carte!",
+                "Turkish": "Yaratıcı ama hayır! Cevap: Bir harita!"
+            },
+            "Nope! The answer was: A map!": {
+                "Spanish": "¡No! ¡La respuesta era: Un mapa!",
+                "French": "Non! La réponse était: Une carte!",
+                "Turkish": "Hayır! Cevap: Bir harita!"
+            },
+            "You completed Medium Riddles! Try Hard next!": {
+                "Spanish": "¡Completaste los Acertijos Medios! ¡Prueba Difícil después!",
+                "French": "Tu as complété les Devinettes Moyennes! Essaie Difficile ensuite!",
+                "Turkish": "Orta Bilmeceleri tamamladın! Sonra Zor seviyeyi dene!"
+            },
+            "Hard Riddles - These will make you think!": {
+                "Spanish": "Acertijos Difíciles - ¡Estos te harán pensar!",
+                "French": "Devinettes Difficiles - Celles-ci vont te faire réfléchir!",
+                "Turkish": "Zor Bilmeceler - Bunlar seni düşündürecek!"
+            },
+            "Riddle 1: I can fly without wings. I can cry without eyes. Wherever I go darkness follows me. What am I?": {
+                "Spanish": "Acertijo 1: Puedo volar sin alas. Puedo llorar sin ojos. Donde voy la oscuridad me sigue. ¿Qué soy?",
+                "French": "Devinette 1: Je peux voler sans ailes. Je peux pleurer sans yeux. Où que j'aille l'obscurité me suit. Que suis-je?",
+                "Turkish": "Bilmece 1: Kanatsız uçabilirim. Gözsüz ağlayabilirim. Nereye gitsem karanlık beni takip eder. Neyim?"
+            },
+            "A cloud": {
+                "Spanish": "Una nube",
+                "French": "Un nuage",
+                "Turkish": "Bir bulut"
+            },
+            "The wind": {
+                "Spanish": "El viento",
+                "French": "Le vent",
+                "Turkish": "Rüzgar"
+            },
+            "A shadow": {
+                "Spanish": "Una sombra",
+                "French": "Une ombre",
+                "Turkish": "Bir gölge"
+            },
+            "A bat": {
+                "Spanish": "Un murciélago",
+                "French": "Une chauve-souris",
+                "Turkish": "Bir yarasa"
+            },
+            "Correct! Clouds fly and cry rain and block the sun!": {
+                "Spanish": "¡Correcto! ¡Las nubes vuelan y lloran lluvia y bloquean el sol!",
+                "French": "Correct! Les nuages volent et pleurent la pluie et bloquent le soleil!",
+                "Turkish": "Doğru! Bulutlar uçar yağmur yağdırır ve güneşi engeller!"
+            },
+            "Good guess but no! The answer was: A cloud!": {
+                "Spanish": "¡Buena suposición pero no! ¡La respuesta era: Una nube!",
+                "French": "Bonne idée mais non! La réponse était: Un nuage!",
+                "Turkish": "İyi tahmin ama hayır! Cevap: Bir bulut!"
+            },
+            "Shadows dont cry! The answer was: A cloud!": {
+                "Spanish": "¡Las sombras no lloran! ¡La respuesta era: Una nube!",
+                "French": "Les ombres ne pleurent pas! La réponse était: Un nuage!",
+                "Turkish": "Gölgeler ağlamaz! Cevap: Bir bulut!"
+            },
+            "Bats have wings! The answer was: A cloud!": {
+                "Spanish": "¡Los murciélagos tienen alas! ¡La respuesta era: Una nube!",
+                "French": "Les chauves-souris ont des ailes! La réponse était: Un nuage!",
+                "Turkish": "Yarasaların kanatları var! Cevap: Bir bulut!"
+            },
+            "Riddle 2: What disappears as soon as you say its name?": {
+                "Spanish": "Acertijo 2: ¿Qué desaparece tan pronto como dices su nombre?",
+                "French": "Devinette 2: Qu'est-ce qui disparaît dès que tu prononces son nom?",
+                "Turkish": "Bilmece 2: İsmini söyler söylemez kaybolan nedir?"
+            },
+            "Darkness": {
+                "Spanish": "Oscuridad",
+                "French": "L'obscurité",
+                "Turkish": "Karanlık"
+            },
+            "Silence": {
+                "Spanish": "Silencio",
+                "French": "Le silence",
+                "Turkish": "Sessizlik"
+            },
+            "A secret": {
+                "Spanish": "Un secreto",
+                "French": "Un secret",
+                "Turkish": "Bir sır"
+            },
+            "Time": {
+                "Spanish": "Tiempo",
+                "French": "Le temps",
+                "Turkish": "Zaman"
+            },
+            "Correct! Saying silence breaks the silence!": {
+                "Spanish": "¡Correcto! ¡Decir silencio rompe el silencio!",
+                "French": "Correct! Dire silence brise le silence!",
+                "Turkish": "Doğru! Sessizlik demek sessizliği bozar!"
+            },
+            "Nope! The answer was: Silence!": {
+                "Spanish": "¡No! ¡La respuesta era: Silencio!",
+                "French": "Non! La réponse était: Le silence!",
+                "Turkish": "Hayır! Cevap: Sessizlik!"
+            },
+            "Clever but no! The answer was: Silence!": {
+                "Spanish": "¡Inteligente pero no! ¡La respuesta era: Silencio!",
+                "French": "Astucieux mais non! La réponse était: Le silence!",
+                "Turkish": "Akıllıca ama hayır! Cevap: Sessizlik!"
+            },
+            "Riddle 3: What can travel around the world while staying in a corner?": {
+                "Spanish": "Acertijo 3: ¿Qué puede viajar por todo el mundo mientras se queda en una esquina?",
+                "French": "Devinette 3: Qu'est-ce qui peut voyager autour du monde tout en restant dans un coin?",
+                "Turkish": "Bilmece 3: Bir köşede kalırken dünyayı dolaşabilen nedir?"
+            },
+            "The internet": {
+                "Spanish": "El internet",
+                "French": "Internet",
+                "Turkish": "İnternet"
+            },
+            "A stamp": {
+                "Spanish": "Un sello",
+                "French": "Un timbre",
+                "Turkish": "Bir pul"
+            },
+            "A satellite": {
+                "Spanish": "Un satélite",
+                "French": "Un satellite",
+                "Turkish": "Bir uydu"
+            },
+            "Light": {
+                "Spanish": "Luz",
+                "French": "La lumière",
+                "Turkish": "Işık"
+            },
+            "Correct! A stamp stays in the corner of an envelope!": {
+                "Spanish": "¡Correcto! ¡Un sello se queda en la esquina de un sobre!",
+                "French": "Correct! Un timbre reste dans le coin d'une enveloppe!",
+                "Turkish": "Doğru! Pul zarfın köşesinde kalır!"
+            },
+            "Modern thinking but no! The answer was: A stamp!": {
+                "Spanish": "¡Pensamiento moderno pero no! ¡La respuesta era: Un sello!",
+                "French": "Pensée moderne mais non! La réponse était: Un timbre!",
+                "Turkish": "Modern düşünce ama hayır! Cevap: Bir pul!"
+            },
+            "Nope! The answer was: A stamp!": {
+                "Spanish": "¡No! ¡La respuesta era: Un sello!",
+                "French": "Non! La réponse était: Un timbre!",
+                "Turkish": "Hayır! Cevap: Bir pul!"
+            },
+            "You completed Hard Riddles! Try Expert if you dare!": {
+                "Spanish": "¡Completaste los Acertijos Difíciles! ¡Prueba Experto si te atreves!",
+                "French": "Tu as complété les Devinettes Difficiles! Essaie Expert si tu l'oses!",
+                "Turkish": "Zor Bilmeceleri tamamladın! Cesaretim varsa Uzman seviyeyi dene!"
+            },
+            "Expert Riddles - Only true puzzle masters can solve these!": {
+                "Spanish": "Acertijos Expertos - ¡Solo los verdaderos maestros de rompecabezas pueden resolverlos!",
+                "French": "Devinettes Expert - Seuls les vrais maîtres de puzzles peuvent les résoudre!",
+                "Turkish": "Uzman Bilmeceler - Bunları sadece gerçek bulmaca ustaları çözebilir!"
+            },
+            "Riddle 1: I am not alive but I grow. I dont have lungs but I need air. I dont have a mouth but water kills me. What am I?": {
+                "Spanish": "Acertijo 1: No estoy vivo pero crezco. No tengo pulmones pero necesito aire. No tengo boca pero el agua me mata. ¿Qué soy?",
+                "French": "Devinette 1: Je ne suis pas vivant mais je grandis. Je n'ai pas de poumons mais j'ai besoin d'air. Je n'ai pas de bouche mais l'eau me tue. Que suis-je?",
+                "Turkish": "Bilmece 1: Canlı değilim ama büyürüm. Ciğerlerim yok ama havaya ihtiyacım var. Ağzım yok ama su beni öldürür. Neyim?"
+            },
+            "A virus": {
+                "Spanish": "Un virus",
+                "French": "Un virus",
+                "Turkish": "Bir virüs"
+            },
+            "Fire": {
+                "Spanish": "Fuego",
+                "French": "Le feu",
+                "Turkish": "Ateş"
+            },
+            "A plant": {
+                "Spanish": "Una planta",
+                "French": "Une plante",
+                "Turkish": "Bir bitki"
+            },
+            "Rust": {
+                "Spanish": "Óxido",
+                "French": "La rouille",
+                "Turkish": "Pas"
+            },
+            "Correct! Fire grows needs air and water kills it!": {
+                "Spanish": "¡Correcto! ¡El fuego crece necesita aire y el agua lo mata!",
+                "French": "Correct! Le feu grandit a besoin d'air et l'eau le tue!",
+                "Turkish": "Doğru! Ateş büyür havaya ihtiyaç duyar ve su onu öldürür!"
+            },
+            "Tricky but no! The answer was: Fire!": {
+                "Spanish": "¡Difícil pero no! ¡La respuesta era: Fuego!",
+                "French": "Rusé mais non! La réponse était: Le feu!",
+                "Turkish": "Zor ama hayır! Cevap: Ateş!"
+            },
+            "Plants are alive! The answer was: Fire!": {
+                "Spanish": "¡Las plantas están vivas! ¡La respuesta era: Fuego!",
+                "French": "Les plantes sont vivantes! La réponse était: Le feu!",
+                "Turkish": "Bitkiler canlıdır! Cevap: Ateş!"
+            },
+            "Very clever but no! The answer was: Fire!": {
+                "Spanish": "¡Muy inteligente pero no! ¡La respuesta era: Fuego!",
+                "French": "Très malin mais non! La réponse était: Le feu!",
+                "Turkish": "Çok akıllıca ama hayır! Cevap: Ateş!"
+            },
+            "Riddle 2: The person who makes it sells it. The person who buys it never uses it. The person who uses it never knows. What is it?": {
+                "Spanish": "Acertijo 2: La persona que lo hace lo vende. La persona que lo compra nunca lo usa. La persona que lo usa nunca lo sabe. ¿Qué es?",
+                "French": "Devinette 2: Celui qui le fabrique le vend. Celui qui l'achète ne l'utilise jamais. Celui qui l'utilise ne le sait jamais. Qu'est-ce?",
+                "Turkish": "Bilmece 2: Yapan satar. Alan asla kullanmaz. Kullanan asla bilmez. Nedir?"
+            },
+            "A gift": {
+                "Spanish": "Un regalo",
+                "French": "Un cadeau",
+                "Turkish": "Bir hediye"
+            },
+            "A coffin": {
+                "Spanish": "Un ataúd",
+                "French": "Un cercueil",
+                "Turkish": "Bir tabut"
+            },
+            "Medicine": {
+                "Spanish": "Medicina",
+                "French": "Un médicament",
+                "Turkish": "İlaç"
+            },
+            "Correct! A coffin is made sold and used without the users knowledge!": {
+                "Spanish": "¡Correcto! ¡Un ataúd se hace se vende y se usa sin que el usuario lo sepa!",
+                "French": "Correct! Un cercueil est fabriqué vendu et utilisé sans que l'utilisateur le sache!",
+                "Turkish": "Doğru! Tabut yapılır satılır ve kullanıcı bilmeden kullanılır!"
+            },
+            "Nope! People know when they get gifts. The answer was: A coffin!": {
+                "Spanish": "¡No! La gente sabe cuando recibe regalos. ¡La respuesta era: Un ataúd!",
+                "French": "Non! Les gens savent quand ils reçoivent des cadeaux. La réponse était: Un cercueil!",
+                "Turkish": "Hayır! İnsanlar hediye aldıklarını bilir. Cevap: Bir tabut!"
+            },
+            "Nope! The answer was: A coffin!": {
+                "Spanish": "¡No! ¡La respuesta era: Un ataúd!",
+                "French": "Non! La réponse était: Un cercueil!",
+                "Turkish": "Hayır! Cevap: Bir tabut!"
+            },
+            "Riddle 3: What English word has three consecutive double letters?": {
+                "Spanish": "Acertijo 3: ¿Qué palabra en inglés tiene tres letras dobles consecutivas?",
+                "French": "Devinette 3: Quel mot anglais a trois lettres doubles consécutives?",
+                "Turkish": "Bilmece 3: Hangi İngilizce kelimenin art arda üç çift harfi var?"
+            },
+            "Bookkeeper": {
+                "Spanish": "Bookkeeper",
+                "French": "Bookkeeper",
+                "Turkish": "Bookkeeper"
+            },
+            "Mississippi": {
+                "Spanish": "Mississippi",
+                "French": "Mississippi",
+                "Turkish": "Mississippi"
+            },
+            "Committee": {
+                "Spanish": "Committee",
+                "French": "Committee",
+                "Turkish": "Committee"
+            },
+            "Successful": {
+                "Spanish": "Successful",
+                "French": "Successful",
+                "Turkish": "Successful"
+            },
+            "Correct! B-OO-KK-EE-per has three double letters in a row!": {
+                "Spanish": "¡Correcto! ¡B-OO-KK-EE-per tiene tres letras dobles seguidas!",
+                "French": "Correct! B-OO-KK-EE-per a trois lettres doubles d'affilée!",
+                "Turkish": "Doğru! B-OO-KK-EE-per art arda üç çift harf içerir!"
+            },
+            "It has doubles but not consecutive! The answer was: Bookkeeper!": {
+                "Spanish": "¡Tiene dobles pero no consecutivas! ¡La respuesta era: Bookkeeper!",
+                "French": "Il a des doubles mais pas consécutives! La réponse était: Bookkeeper!",
+                "Turkish": "Çiftleri var ama ardışık değil! Cevap: Bookkeeper!"
+            },
+            "Close but not three consecutive! The answer was: Bookkeeper!": {
+                "Spanish": "¡Cerca pero no tres consecutivas! ¡La respuesta era: Bookkeeper!",
+                "French": "Proche mais pas trois consécutives! La réponse était: Bookkeeper!",
+                "Turkish": "Yaklaştın ama üç ardışık değil! Cevap: Bookkeeper!"
+            },
+            "You completed Expert Riddles! You are a true puzzle master!": {
+                "Spanish": "¡Completaste los Acertijos Expertos! ¡Eres un verdadero maestro de rompecabezas!",
+                "French": "Tu as complété les Devinettes Expert! Tu es un vrai maître de puzzles!",
+                "Turkish": "Uzman Bilmeceleri tamamladın! Gerçek bir bulmaca ustasısın!"
+            },
             "Thanks for playing Puzzle Mode! Come back for more puzzles soon!": {
                 "Spanish": "¡Gracias por jugar el Modo Rompecabezas! ¡Vuelve pronto para más puzzles!",
                 "French": "Merci d'avoir joué au Mode Puzzle! Reviens bientôt pour plus de puzzles!",
                 "Turkish": "Bulmaca Modunu oynadığın için teşekkürler! Daha fazla bulmaca için yakında geri gel!"
+            },
+            // === MINIGAME MODE ===
+            "Minigame Mode |All Ages|": {
+                "Spanish": "Modo Minijuegos |Todas las Edades|",
+                "French": "Mode Mini-jeux |Tous Âges|",
+                "Turkish": "Mini Oyun Modu |Tüm Yaşlar|"
+            },
+            "WELCOME TO MINIGAME MODE!": {
+                "Spanish": "¡BIENVENIDO AL MODO MINIJUEGOS!",
+                "French": "BIENVENUE AU MODE MINI-JEUX!",
+                "Turkish": "MİNİ OYUN MODUNA HOŞGELDİN!"
+            },
+            "Quick fun challenges await!": {
+                "Spanish": "¡Desafíos rápidos y divertidos te esperan!",
+                "French": "Des défis rapides et amusants t'attendent!",
+                "Turkish": "Hızlı ve eğlenceli meydan okumalar seni bekliyor!"
+            },
+            "Pick your minigame!": {
+                "Spanish": "¡Elige tu minijuego!",
+                "French": "Choisis ton mini-jeu!",
+                "Turkish": "Mini oyununu seç!"
+            },
+            "Survival Mode": {
+                "Spanish": "Modo Supervivencia",
+                "French": "Mode Survie",
+                "Turkish": "Hayatta Kalma Modu"
+            },
+            "Time Attack": {
+                "Spanish": "Contrarreloj",
+                "French": "Contre-la-Montre",
+                "Turkish": "Zamana Karşı"
+            },
+            "=== SURVIVAL MODE ===": {
+                "Spanish": "=== MODO SUPERVIVENCIA ===",
+                "French": "=== MODE SURVIE ===",
+                "Turkish": "=== HAYATTA KALMA MODU ==="
+            },
+            "Answer questions correctly to survive!": {
+                "Spanish": "¡Responde correctamente para sobrevivir!",
+                "French": "Réponds correctement pour survivre!",
+                "Turkish": "Hayatta kalmak için doğru cevap ver!"
+            },
+            "One wrong answer and its GAME OVER!": {
+                "Spanish": "¡Una respuesta incorrecta y es FIN DEL JUEGO!",
+                "French": "Une mauvaise réponse et c'est GAME OVER!",
+                "Turkish": "Bir yanlış cevap ve OYUN BİTTİ!"
+            },
+            "How far can you go?": {
+                "Spanish": "¿Hasta dónde puedes llegar?",
+                "French": "Jusqu'où peux-tu aller?",
+                "Turkish": "Ne kadar ileri gidebilirsin?"
+            },
+            "Press OK when ready to begin!": {
+                "Spanish": "¡Presiona OK cuando estés listo para comenzar!",
+                "French": "Appuie sur OK quand tu es prêt à commencer!",
+                "Turkish": "Başlamaya hazır olduğunda Tamam'a bas!"
+            },
+            "--- Question 1 ---": {
+                "Spanish": "--- Pregunta 1 ---",
+                "French": "--- Question 1 ---",
+                "Turkish": "--- Soru 1 ---"
+            },
+            "What is 5 + 3?": {
+                "Spanish": "¿Cuánto es 5 + 3?",
+                "French": "Combien fait 5 + 3?",
+                "Turkish": "5 + 3 kaç eder?"
+            },
+            "Correct! You survived!": {
+                "Spanish": "¡Correcto! ¡Sobreviviste!",
+                "French": "Correct! Tu as survécu!",
+                "Turkish": "Doğru! Hayatta kaldın!"
+            },
+            "WRONG! 5 + 3 = 8. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! 5 + 3 = 8. ¡FIN DEL JUEGO!",
+                "French": "FAUX! 5 + 3 = 8. GAME OVER!",
+                "Turkish": "YANLIŞ! 5 + 3 = 8. OYUN BİTTİ!"
+            },
+            "Final Score: 0 questions": {
+                "Spanish": "Puntuación Final: 0 preguntas",
+                "French": "Score Final: 0 questions",
+                "Turkish": "Final Skor: 0 soru"
+            },
+            "Better luck next time!": {
+                "Spanish": "¡Mejor suerte la próxima vez!",
+                "French": "Meilleure chance la prochaine fois!",
+                "Turkish": "Bir dahaki sefere bol şans!"
+            },
+            "--- Question 2 ---": {
+                "Spanish": "--- Pregunta 2 ---",
+                "French": "--- Question 2 ---",
+                "Turkish": "--- Soru 2 ---"
+            },
+            "What color do you get mixing blue and yellow?": {
+                "Spanish": "¿Qué color obtienes mezclando azul y amarillo?",
+                "French": "Quelle couleur obtiens-tu en mélangeant bleu et jaune?",
+                "Turkish": "Mavi ve sarıyı karıştırınca hangi renk olur?"
+            },
+            "Green": {
+                "Spanish": "Verde",
+                "French": "Vert",
+                "Turkish": "Yeşil"
+            },
+            "Purple": {
+                "Spanish": "Morado",
+                "French": "Violet",
+                "Turkish": "Mor"
+            },
+            "Orange": {
+                "Spanish": "Naranja",
+                "French": "Orange",
+                "Turkish": "Turuncu"
+            },
+            "Brown": {
+                "Spanish": "Marrón",
+                "French": "Marron",
+                "Turkish": "Kahverengi"
+            },
+            "WRONG! Blue + Yellow = Green. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! Azul + Amarillo = Verde. ¡FIN DEL JUEGO!",
+                "French": "FAUX! Bleu + Jaune = Vert. GAME OVER!",
+                "Turkish": "YANLIŞ! Mavi + Sarı = Yeşil. OYUN BİTTİ!"
+            },
+            "Final Score: 1 question": {
+                "Spanish": "Puntuación Final: 1 pregunta",
+                "French": "Score Final: 1 question",
+                "Turkish": "Final Skor: 1 soru"
+            },
+            "--- Question 3 ---": {
+                "Spanish": "--- Pregunta 3 ---",
+                "French": "--- Question 3 ---",
+                "Turkish": "--- Soru 3 ---"
+            },
+            "How many legs does a spider have?": {
+                "Spanish": "¿Cuántas patas tiene una araña?",
+                "French": "Combien de pattes a une araignée?",
+                "Turkish": "Bir örümceğin kaç bacağı var?"
+            },
+            "WRONG! Spiders have 8 legs. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! Las arañas tienen 8 patas. ¡FIN DEL JUEGO!",
+                "French": "FAUX! Les araignées ont 8 pattes. GAME OVER!",
+                "Turkish": "YANLIŞ! Örümceklerin 8 bacağı var. OYUN BİTTİ!"
+            },
+            "Final Score: 2 questions": {
+                "Spanish": "Puntuación Final: 2 preguntas",
+                "French": "Score Final: 2 questions",
+                "Turkish": "Final Skor: 2 soru"
+            },
+            "--- Question 4 ---": {
+                "Spanish": "--- Pregunta 4 ---",
+                "French": "--- Question 4 ---",
+                "Turkish": "--- Soru 4 ---"
+            },
+            "What is 12 x 12?": {
+                "Spanish": "¿Cuánto es 12 x 12?",
+                "French": "Combien fait 12 x 12?",
+                "Turkish": "12 x 12 kaç eder?"
+            },
+            "124": {
+                "Spanish": "124",
+                "French": "124",
+                "Turkish": "124"
+            },
+            "144": {
+                "Spanish": "144",
+                "French": "144",
+                "Turkish": "144"
+            },
+            "132": {
+                "Spanish": "132",
+                "French": "132",
+                "Turkish": "132"
+            },
+            "156": {
+                "Spanish": "156",
+                "French": "156",
+                "Turkish": "156"
+            },
+            "WRONG! 12 x 12 = 144. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! 12 x 12 = 144. ¡FIN DEL JUEGO!",
+                "French": "FAUX! 12 x 12 = 144. GAME OVER!",
+                "Turkish": "YANLIŞ! 12 x 12 = 144. OYUN BİTTİ!"
+            },
+            "Final Score: 3 questions": {
+                "Spanish": "Puntuación Final: 3 preguntas",
+                "French": "Score Final: 3 questions",
+                "Turkish": "Final Skor: 3 soru"
+            },
+            "--- Question 5 ---": {
+                "Spanish": "--- Pregunta 5 ---",
+                "French": "--- Question 5 ---",
+                "Turkish": "--- Soru 5 ---"
+            },
+            "Which planet is known as the Red Planet?": {
+                "Spanish": "¿Qué planeta es conocido como el Planeta Rojo?",
+                "French": "Quelle planète est connue comme la Planète Rouge?",
+                "Turkish": "Hangi gezegen Kızıl Gezegen olarak bilinir?"
+            },
+            "Venus": {
+                "Spanish": "Venus",
+                "French": "Vénus",
+                "Turkish": "Venüs"
+            },
+            "Jupiter": {
+                "Spanish": "Júpiter",
+                "French": "Jupiter",
+                "Turkish": "Jüpiter"
+            },
+            "Mars": {
+                "Spanish": "Marte",
+                "French": "Mars",
+                "Turkish": "Mars"
+            },
+            "Saturn": {
+                "Spanish": "Saturno",
+                "French": "Saturne",
+                "Turkish": "Satürn"
+            },
+            "WRONG! Mars is the Red Planet. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! Marte es el Planeta Rojo. ¡FIN DEL JUEGO!",
+                "French": "FAUX! Mars est la Planète Rouge. GAME OVER!",
+                "Turkish": "YANLIŞ! Mars Kızıl Gezegendir. OYUN BİTTİ!"
+            },
+            "Final Score: 4 questions": {
+                "Spanish": "Puntuación Final: 4 preguntas",
+                "French": "Score Final: 4 questions",
+                "Turkish": "Final Skor: 4 soru"
+            },
+            "--- Question 6 ---": {
+                "Spanish": "--- Pregunta 6 ---",
+                "French": "--- Question 6 ---",
+                "Turkish": "--- Soru 6 ---"
+            },
+            "What is the capital of France?": {
+                "Spanish": "¿Cuál es la capital de Francia?",
+                "French": "Quelle est la capitale de la France?",
+                "Turkish": "Fransa'nın başkenti neresidir?"
+            },
+            "London": {
+                "Spanish": "Londres",
+                "French": "Londres",
+                "Turkish": "Londra"
+            },
+            "Berlin": {
+                "Spanish": "Berlín",
+                "French": "Berlin",
+                "Turkish": "Berlin"
+            },
+            "Madrid": {
+                "Spanish": "Madrid",
+                "French": "Madrid",
+                "Turkish": "Madrid"
+            },
+            "Paris": {
+                "Spanish": "París",
+                "French": "Paris",
+                "Turkish": "Paris"
+            },
+            "WRONG! Paris is the capital of France. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! París es la capital de Francia. ¡FIN DEL JUEGO!",
+                "French": "FAUX! Paris est la capitale de la France. GAME OVER!",
+                "Turkish": "YANLIŞ! Paris Fransa'nın başkentidir. OYUN BİTTİ!"
+            },
+            "Final Score: 5 questions": {
+                "Spanish": "Puntuación Final: 5 preguntas",
+                "French": "Score Final: 5 questions",
+                "Turkish": "Final Skor: 5 soru"
+            },
+            "--- Question 7 ---": {
+                "Spanish": "--- Pregunta 7 ---",
+                "French": "--- Question 7 ---",
+                "Turkish": "--- Soru 7 ---"
+            },
+            "What is 99 + 99?": {
+                "Spanish": "¿Cuánto es 99 + 99?",
+                "French": "Combien fait 99 + 99?",
+                "Turkish": "99 + 99 kaç eder?"
+            },
+            "198": {
+                "Spanish": "198",
+                "French": "198",
+                "Turkish": "198"
+            },
+            "189": {
+                "Spanish": "189",
+                "French": "189",
+                "Turkish": "189"
+            },
+            "199": {
+                "Spanish": "199",
+                "French": "199",
+                "Turkish": "199"
+            },
+            "188": {
+                "Spanish": "188",
+                "French": "188",
+                "Turkish": "188"
+            },
+            "WRONG! 99 + 99 = 198. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! 99 + 99 = 198. ¡FIN DEL JUEGO!",
+                "French": "FAUX! 99 + 99 = 198. GAME OVER!",
+                "Turkish": "YANLIŞ! 99 + 99 = 198. OYUN BİTTİ!"
+            },
+            "Final Score: 6 questions": {
+                "Spanish": "Puntuación Final: 6 preguntas",
+                "French": "Score Final: 6 questions",
+                "Turkish": "Final Skor: 6 soru"
+            },
+            "--- Question 8 ---": {
+                "Spanish": "--- Pregunta 8 ---",
+                "French": "--- Question 8 ---",
+                "Turkish": "--- Soru 8 ---"
+            },
+            "How many continents are there?": {
+                "Spanish": "¿Cuántos continentes hay?",
+                "French": "Combien y a-t-il de continents?",
+                "Turkish": "Kaç kıta var?"
+            },
+            "WRONG! There are 7 continents. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! Hay 7 continentes. ¡FIN DEL JUEGO!",
+                "French": "FAUX! Il y a 7 continents. GAME OVER!",
+                "Turkish": "YANLIŞ! 7 kıta var. OYUN BİTTİ!"
+            },
+            "Final Score: 7 questions": {
+                "Spanish": "Puntuación Final: 7 preguntas",
+                "French": "Score Final: 7 questions",
+                "Turkish": "Final Skor: 7 soru"
+            },
+            "--- Question 9 ---": {
+                "Spanish": "--- Pregunta 9 ---",
+                "French": "--- Question 9 ---",
+                "Turkish": "--- Soru 9 ---"
+            },
+            "What is the square root of 81?": {
+                "Spanish": "¿Cuál es la raíz cuadrada de 81?",
+                "French": "Quelle est la racine carrée de 81?",
+                "Turkish": "81'in karekökü kaçtır?"
+            },
+            "WRONG! Square root of 81 is 9. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! La raíz cuadrada de 81 es 9. ¡FIN DEL JUEGO!",
+                "French": "FAUX! La racine carrée de 81 est 9. GAME OVER!",
+                "Turkish": "YANLIŞ! 81'in karekökü 9'dur. OYUN BİTTİ!"
+            },
+            "Final Score: 8 questions": {
+                "Spanish": "Puntuación Final: 8 preguntas",
+                "French": "Score Final: 8 questions",
+                "Turkish": "Final Skor: 8 soru"
+            },
+            "--- Question 10 - FINAL QUESTION ---": {
+                "Spanish": "--- Pregunta 10 - PREGUNTA FINAL ---",
+                "French": "--- Question 10 - QUESTION FINALE ---",
+                "Turkish": "--- Soru 10 - FİNAL SORUSU ---"
+            },
+            "In what year did World War II end?": {
+                "Spanish": "¿En qué año terminó la Segunda Guerra Mundial?",
+                "French": "En quelle année la Seconde Guerre mondiale s'est-elle terminée?",
+                "Turkish": "İkinci Dünya Savaşı hangi yılda sona erdi?"
+            },
+            "1943": {
+                "Spanish": "1943",
+                "French": "1943",
+                "Turkish": "1943"
+            },
+            "1944": {
+                "Spanish": "1944",
+                "French": "1944",
+                "Turkish": "1944"
+            },
+            "1945": {
+                "Spanish": "1945",
+                "French": "1945",
+                "Turkish": "1945"
+            },
+            "1946": {
+                "Spanish": "1946",
+                "French": "1946",
+                "Turkish": "1946"
+            },
+            "CORRECT!": {
+                "Spanish": "¡CORRECTO!",
+                "French": "CORRECT!",
+                "Turkish": "DOĞRU!"
+            },
+            "CONGRATULATIONS! PERFECT SCORE!": {
+                "Spanish": "¡FELICIDADES! ¡PUNTUACIÓN PERFECTA!",
+                "French": "FÉLICITATIONS! SCORE PARFAIT!",
+                "Turkish": "TEBRİKLER! MÜKEMMEL SKOR!"
+            },
+            "You answered all 10 questions correctly!": {
+                "Spanish": "¡Respondiste las 10 preguntas correctamente!",
+                "French": "Tu as répondu correctement aux 10 questions!",
+                "Turkish": "10 sorunun hepsini doğru cevapladın!"
+            },
+            "You are a SURVIVAL CHAMPION!": {
+                "Spanish": "¡Eres un CAMPEÓN DE SUPERVIVENCIA!",
+                "French": "Tu es un CHAMPION DE SURVIE!",
+                "Turkish": "Sen bir HAYATTA KALMA ŞAMPİYONUSUN!"
+            },
+            "Amazing job! You mastered Survival Mode!": {
+                "Spanish": "¡Increíble trabajo! ¡Dominaste el Modo Supervivencia!",
+                "French": "Travail incroyable! Tu as maîtrisé le Mode Survie!",
+                "Turkish": "Harika iş! Hayatta Kalma Modunda ustalaştın!"
+            },
+            "WRONG! WWII ended in 1945. GAME OVER!": {
+                "Spanish": "¡INCORRECTO! La IIGM terminó en 1945. ¡FIN DEL JUEGO!",
+                "French": "FAUX! La 2GM s'est terminée en 1945. GAME OVER!",
+                "Turkish": "YANLIŞ! 2. Dünya Savaşı 1945'te bitti. OYUN BİTTİ!"
+            },
+            "Final Score: 9 questions - SO CLOSE!": {
+                "Spanish": "Puntuación Final: 9 preguntas - ¡TAN CERCA!",
+                "French": "Score Final: 9 questions - SI PROCHE!",
+                "Turkish": "Final Skor: 9 soru - ÇOK YAKINDIN!"
+            },
+            "You were one question away from victory!": {
+                "Spanish": "¡Estabas a una pregunta de la victoria!",
+                "French": "Tu étais à une question de la victoire!",
+                "Turkish": "Zaferden bir soru uzaktaydın!"
+            },
+            "=== TIME ATTACK ===": {
+                "Spanish": "=== CONTRARRELOJ ===",
+                "French": "=== CONTRE-LA-MONTRE ===",
+                "Turkish": "=== ZAMANA KARŞI ==="
+            },
+            "Answer 10 questions as FAST as you can!": {
+                "Spanish": "¡Responde 10 preguntas lo más RÁPIDO que puedas!",
+                "French": "Réponds à 10 questions le plus VITE possible!",
+                "Turkish": "10 soruyu olabildiğince HIZLI cevapla!"
+            },
+            "Start a timer on your phone or watch!": {
+                "Spanish": "¡Inicia un cronómetro en tu teléfono o reloj!",
+                "French": "Démarre un chrono sur ton téléphone ou ta montre!",
+                "Turkish": "Telefonunda veya saatinde bir zamanlayıcı başlat!"
+            },
+            "Wrong answers add 5 seconds to your time!": {
+                "Spanish": "¡Las respuestas incorrectas añaden 5 segundos a tu tiempo!",
+                "French": "Les mauvaises réponses ajoutent 5 secondes à ton temps!",
+                "Turkish": "Yanlış cevaplar süreye 5 saniye ekler!"
+            },
+            "Ready? Start your timer and press OK!": {
+                "Spanish": "¿Listo? ¡Inicia tu cronómetro y presiona OK!",
+                "French": "Prêt? Démarre ton chrono et appuie sur OK!",
+                "Turkish": "Hazır mısın? Zamanlayıcını başlat ve Tamam'a bas!"
+            },
+            "--- Q1 ---": {
+                "Spanish": "--- P1 ---",
+                "French": "--- Q1 ---",
+                "Turkish": "--- S1 ---"
+            },
+            "2 + 2 = ?": {
+                "Spanish": "2 + 2 = ?",
+                "French": "2 + 2 = ?",
+                "Turkish": "2 + 2 = ?"
+            },
+            "Correct!": {
+                "Spanish": "¡Correcto!",
+                "French": "Correct!",
+                "Turkish": "Doğru!"
+            },
+            "Wrong! +5 seconds penalty!": {
+                "Spanish": "¡Incorrecto! +5 segundos de penalización!",
+                "French": "Faux! +5 secondes de pénalité!",
+                "Turkish": "Yanlış! +5 saniye ceza!"
+            },
+            "--- Q2 ---": {
+                "Spanish": "--- P2 ---",
+                "French": "--- Q2 ---",
+                "Turkish": "--- S2 ---"
+            },
+            "Opposite of hot?": {
+                "Spanish": "¿Opuesto de caliente?",
+                "French": "Le contraire de chaud?",
+                "Turkish": "Sıcağın zıttı?"
+            },
+            "Cold": {
+                "Spanish": "Frío",
+                "French": "Froid",
+                "Turkish": "Soğuk"
+            },
+            "Warm": {
+                "Spanish": "Tibio",
+                "French": "Tiède",
+                "Turkish": "Ilık"
+            },
+            "Cool": {
+                "Spanish": "Fresco",
+                "French": "Frais",
+                "Turkish": "Serin"
+            },
+            "Freezing": {
+                "Spanish": "Helado",
+                "French": "Glacial",
+                "Turkish": "Dondurucu"
+            },
+            "Wrong! +5 seconds!": {
+                "Spanish": "¡Incorrecto! +5 segundos!",
+                "French": "Faux! +5 secondes!",
+                "Turkish": "Yanlış! +5 saniye!"
+            },
+            "--- Q3 ---": {
+                "Spanish": "--- P3 ---",
+                "French": "--- Q3 ---",
+                "Turkish": "--- S3 ---"
+            },
+            "10 x 5 = ?": {
+                "Spanish": "10 x 5 = ?",
+                "French": "10 x 5 = ?",
+                "Turkish": "10 x 5 = ?"
+            },
+            "45": {
+                "Spanish": "45",
+                "French": "45",
+                "Turkish": "45"
+            },
+            "50": {
+                "Spanish": "50",
+                "French": "50",
+                "Turkish": "50"
+            },
+            "55": {
+                "Spanish": "55",
+                "French": "55",
+                "Turkish": "55"
+            },
+            "40": {
+                "Spanish": "40",
+                "French": "40",
+                "Turkish": "40"
+            },
+            "--- Q4 ---": {
+                "Spanish": "--- P4 ---",
+                "French": "--- Q4 ---",
+                "Turkish": "--- S4 ---"
+            },
+            "A baby dog is called a?": {
+                "Spanish": "¿Cómo se llama un perro bebé?",
+                "French": "Comment appelle-t-on un bébé chien?",
+                "Turkish": "Yavru köpeğe ne denir?"
+            },
+            "Kitten": {
+                "Spanish": "Gatito",
+                "French": "Chaton",
+                "Turkish": "Yavru kedi"
+            },
+            "Cub": {
+                "Spanish": "Cachorro",
+                "French": "Ourson",
+                "Turkish": "Yavru"
+            },
+            "Puppy": {
+                "Spanish": "Cachorro",
+                "French": "Chiot",
+                "Turkish": "Yavru köpek"
+            },
+            "Calf": {
+                "Spanish": "Ternero",
+                "French": "Veau",
+                "Turkish": "Buzağı"
+            },
+            "--- Q5 ---": {
+                "Spanish": "--- P5 ---",
+                "French": "--- Q5 ---",
+                "Turkish": "--- S5 ---"
+            },
+            "100 divided by 4 = ?": {
+                "Spanish": "100 dividido por 4 = ?",
+                "French": "100 divisé par 4 = ?",
+                "Turkish": "100 bölü 4 = ?"
+            },
+            "20": {
+                "Spanish": "20",
+                "French": "20",
+                "Turkish": "20"
+            },
+            "25": {
+                "Spanish": "25",
+                "French": "25",
+                "Turkish": "25"
+            },
+            "30": {
+                "Spanish": "30",
+                "French": "30",
+                "Turkish": "30"
+            },
+            "24": {
+                "Spanish": "24",
+                "French": "24",
+                "Turkish": "24"
+            },
+            "--- Q6 ---": {
+                "Spanish": "--- P6 ---",
+                "French": "--- Q6 ---",
+                "Turkish": "--- S6 ---"
+            },
+            "Which is bigger: 1/2 or 1/4?": {
+                "Spanish": "¿Cuál es más grande: 1/2 o 1/4?",
+                "French": "Lequel est plus grand: 1/2 ou 1/4?",
+                "Turkish": "Hangisi daha büyük: 1/2 mi 1/4 mü?"
+            },
+            "1/2": {
+                "Spanish": "1/2",
+                "French": "1/2",
+                "Turkish": "1/2"
+            },
+            "1/4": {
+                "Spanish": "1/4",
+                "French": "1/4",
+                "Turkish": "1/4"
+            },
+            "Same": {
+                "Spanish": "Igual",
+                "French": "Pareil",
+                "Turkish": "Aynı"
+            },
+            "Depends": {
+                "Spanish": "Depende",
+                "French": "Ça dépend",
+                "Turkish": "Duruma göre"
+            },
+            "--- Q7 ---": {
+                "Spanish": "--- P7 ---",
+                "French": "--- Q7 ---",
+                "Turkish": "--- S7 ---"
+            },
+            "How many days in a week?": {
+                "Spanish": "¿Cuántos días hay en una semana?",
+                "French": "Combien de jours dans une semaine?",
+                "Turkish": "Bir haftada kaç gün var?"
+            },
+            "--- Q8 ---": {
+                "Spanish": "--- P8 ---",
+                "French": "--- Q8 ---",
+                "Turkish": "--- S8 ---"
+            },
+            "15 + 17 = ?": {
+                "Spanish": "15 + 17 = ?",
+                "French": "15 + 17 = ?",
+                "Turkish": "15 + 17 = ?"
+            },
+            "31": {
+                "Spanish": "31",
+                "French": "31",
+                "Turkish": "31"
+            },
+            "32": {
+                "Spanish": "32",
+                "French": "32",
+                "Turkish": "32"
+            },
+            "33": {
+                "Spanish": "33",
+                "French": "33",
+                "Turkish": "33"
+            },
+            "34": {
+                "Spanish": "34",
+                "French": "34",
+                "Turkish": "34"
+            },
+            "--- Q9 ---": {
+                "Spanish": "--- P9 ---",
+                "French": "--- Q9 ---",
+                "Turkish": "--- S9 ---"
+            },
+            "Opposite of up?": {
+                "Spanish": "¿Opuesto de arriba?",
+                "French": "Le contraire de haut?",
+                "Turkish": "Yukarının zıttı?"
+            },
+            "Left": {
+                "Spanish": "Izquierda",
+                "French": "Gauche",
+                "Turkish": "Sol"
+            },
+            "Right": {
+                "Spanish": "Derecha",
+                "French": "Droite",
+                "Turkish": "Sağ"
+            },
+            "Down": {
+                "Spanish": "Abajo",
+                "French": "Bas",
+                "Turkish": "Aşağı"
+            },
+            "Side": {
+                "Spanish": "Lado",
+                "French": "Côté",
+                "Turkish": "Yan"
+            },
+            "--- Q10 FINAL ---": {
+                "Spanish": "--- P10 FINAL ---",
+                "French": "--- Q10 FINALE ---",
+                "Turkish": "--- S10 FİNAL ---"
+            },
+            "9 x 9 = ?": {
+                "Spanish": "9 x 9 = ?",
+                "French": "9 x 9 = ?",
+                "Turkish": "9 x 9 = ?"
+            },
+            "72": {
+                "Spanish": "72",
+                "French": "72",
+                "Turkish": "72"
+            },
+            "81": {
+                "Spanish": "81",
+                "French": "81",
+                "Turkish": "81"
+            },
+            "90": {
+                "Spanish": "90",
+                "French": "90",
+                "Turkish": "90"
+            },
+            "79": {
+                "Spanish": "79",
+                "French": "79",
+                "Turkish": "79"
+            },
+            "STOP YOUR TIMER!": {
+                "Spanish": "¡DETÉN TU CRONÓMETRO!",
+                "French": "ARRÊTE TON CHRONO!",
+                "Turkish": "ZAMANLAYICINI DURDUR!"
+            },
+            "TIME RANKINGS:": {
+                "Spanish": "CLASIFICACIÓN DE TIEMPO:",
+                "French": "CLASSEMENT TEMPS:",
+                "Turkish": "ZAMAN SIRALAMALARI:"
+            },
+            "Under 15 seconds = LIGHTNING FAST!": {
+                "Spanish": "Menos de 15 segundos = ¡VELOCIDAD RELÁMPAGO!",
+                "French": "Moins de 15 secondes = ULTRA RAPIDE!",
+                "Turkish": "15 saniyenin altı = ŞİMŞEK HIZI!"
+            },
+            "15-25 seconds = SPEEDY!": {
+                "Spanish": "15-25 segundos = ¡RÁPIDO!",
+                "French": "15-25 secondes = RAPIDE!",
+                "Turkish": "15-25 saniye = HIZLI!"
+            },
+            "25-35 seconds = GOOD!": {
+                "Spanish": "25-35 segundos = ¡BIEN!",
+                "French": "25-35 secondes = BON!",
+                "Turkish": "25-35 saniye = İYİ!"
+            },
+            "35-45 seconds = AVERAGE": {
+                "Spanish": "35-45 segundos = PROMEDIO",
+                "French": "35-45 secondes = MOYEN",
+                "Turkish": "35-45 saniye = ORTALAMA"
+            },
+            "Over 45 seconds = KEEP PRACTICING!": {
+                "Spanish": "Más de 45 segundos = ¡SIGUE PRACTICANDO!",
+                "French": "Plus de 45 secondes = CONTINUE À T'ENTRAÎNER!",
+                "Turkish": "45 saniyenin üstü = PRATİK YAPMAYA DEVAM ET!"
+            },
+            "Remember to add 5 seconds for each wrong answer!": {
+                "Spanish": "¡Recuerda añadir 5 segundos por cada respuesta incorrecta!",
+                "French": "N'oublie pas d'ajouter 5 secondes pour chaque mauvaise réponse!",
+                "Turkish": "Her yanlış cevap için 5 saniye eklemeyi unutma!"
+            },
+            "Great job! Try again to beat your time!": {
+                "Spanish": "¡Buen trabajo! ¡Inténtalo de nuevo para superar tu tiempo!",
+                "French": "Bon travail! Réessaie pour battre ton temps!",
+                "Turkish": "Harika iş! Süreyi geçmek için tekrar dene!"
+            },
+            "Thanks for playing Minigame Mode!": {
+                "Spanish": "¡Gracias por jugar el Modo Minijuegos!",
+                "French": "Merci d'avoir joué au Mode Mini-jeux!",
+                "Turkish": "Mini Oyun Modunu oynadığın için teşekkürler!"
             },
             // === GUESSING GAME MODE ===
             "WELCOME TO GUESSING GAME MODE!": {
@@ -2583,11 +4275,25 @@
                 setTimeout(() => this.startGame(), 500);
             }
             writeText(text) {
+                const textStr = String(text);
                 const msg = document.createElement('div');
                 msg.className = 'message';
-                msg.textContent = translate(String(text));
+                msg.textContent = translate(textStr);
                 this.textArea.appendChild(msg);
                 this.textArea.scrollTop = this.textArea.scrollHeight;
+                
+                // Timer control for Time Attack mode
+                if (textStr.includes('=== TIME ATTACK ===')) {
+                    // Time Attack mode starting - show timer but don't start yet
+                    document.getElementById('timer-display').classList.add('active');
+                }
+                if (textStr.includes('Ready? Start your timer')) {
+                    // Will start on OK click - handled in askQuestion
+                    this.timeAttackPending = true;
+                }
+                if (textStr.includes('STOP YOUR TIMER!')) {
+                    gameTimer.stop();
+                }
             }
             async askQuestion(question) {
                 this.writeText(question);
@@ -2596,10 +4302,24 @@
                 this.choicesDiv.innerHTML = '';
                 this.userInput.value = '';
                 this.userInput.focus();
-                return new Promise(resolve => { this.inputResolver = resolve; });
+                
+                // Check if this is the Time Attack start prompt
+                const startTimerOnSubmit = this.timeAttackPending;
+                this.timeAttackPending = false;
+                
+                return new Promise(resolve => { 
+                    this.inputResolver = resolve;
+                    this.startTimerOnSubmit = startTimerOnSubmit;
+                });
             }
             submitAnswer() {
                 if (this.inputResolver) {
+                    // Start timer if this is the Time Attack ready prompt
+                    if (this.startTimerOnSubmit) {
+                        gameTimer.start();
+                        this.startTimerOnSubmit = false;
+                    }
+                    
                     const answer = this.userInput.value;
                     this.lastAnswer = answer;
                     if (answer.trim()) {
@@ -2632,6 +4352,7 @@
                             if (isLangOption) {
                                 currentLanguage = opt;
                                 console.log('Language set to:', currentLanguage);
+                                updateUILanguage(currentLanguage);
                             }
                             const msg = document.createElement('div');
                             msg.className = 'message user';
@@ -2665,1262 +4386,7 @@
             }
             async startGame() {
                 try {
-                this.writeText('     WELCOME TO THE CONVERSATION GAME!');
-                this.writeText('==================================================');
-                this.writeText(' ');
-                this.writeText('Please select your language / Por favor selecciona tu idioma');
-                this.writeText('Lutfen dilinizi secin / Veuillez choisir votre langue');
-                this.writeText(' ');
-                this.lastAnswer = await this.showChoices('SELECT YOUR LANGUAGE:', ['English', 'Turkish', 'Spanish', 'French']);
-                var gameLanguage = this.lastAnswer;
-                this.writeText(' ');
-                this.writeText('|================================================================================================================================================================================|');
-                this.writeText('|READ: THIS IS IMPORTANT                            HAVE FUN :3                                                                                                                   |');
-                this.writeText('|================================================================================================================================================================================|');
-                this.writeText(' ');
-                this.writeText('Great now choose the gamemode!!! But before that... ');
-                this.lastAnswer = await this.showChoices('Welcome To The Game, Want A Tutorial? ', ['Yes', 'No']);
-                var q10 = this.lastAnswer;
-                if (String(q10) === 'Yes') {
-                    this.lastAnswer = await this.askQuestion('This is a question you can type to reply or press enter to skip!');
-                    this.writeText('But there are some stuff you cant answer such as this so it just continues!');
-                    this.lastAnswer = String(Math.floor(Math.random() * (2 - 1 + 1)) + 1);
-                    var secretNumber = this.lastAnswer;
-                    this.lastAnswer = await this.askQuestion('There are also guessing games where I think of a number and you try to guess it! I am thinking of a number 1-2 Guess!  ');
-                    var guess = this.lastAnswer;
-                    if (String(guess) === String(secretNumber)) {
-                        this.writeText('NICE JOB!  \\(*o*)/');
-                        await this.beep(523, 80);
-                        await this.beep(659, 80);
-                        await this.beep(784, 80);
-                        await this.beep(1047, 230);
-                        this.writeText('It indeed was ' + secretNumber + '!!!');
-                    }
-                    if (parseInt(guess) > parseInt('secretNumber')) {
-                        this.writeText('Too high! Try again next time! :D');
-                    }
-                    if (parseInt(guess) < parseInt('secretNumber')) {
-                        this.writeText('Too low! Try again next time! :D');
-                    }
-                    this.lastAnswer = await this.showChoices('There are some multi-choice questions such as this! The option you choose changes the response! Press One of The Buttons! Choose one now!', ['Taco', 'Burrito']);
-                    var q11 = this.lastAnswer;
-                    if (String(q11) === 'Taco') {
-                        this.writeText('Taco GANG!!!');
-                    }
-                    if (String(q11) === 'Burrito') {
-                        this.writeText('Burrito RULES!!!');
-                    }
-                    this.lastAnswer = await this.askQuestion('Oh and there are also sounds time to time reply to this to listen! :D');
-                    await this.beep(523, 200);
-                    await this.beep(659, 200);
-                    await this.beep(784, 200);
-                    await this.beep(1000, 200);
-                    await this.beep(1500, 1000);
-                    this.lastAnswer = await this.askQuestion('Alright that\'s all! Reply to finish!');
-                }
-                if (String(q10) === 'No') {
-                    this.writeText('Okay your loss! ');
-                }
-                this.lastAnswer = await this.showChoices('Alright now choose a gamemode!!!', ['Normal Mode |All Ages|', 'Puzzle Mode |All Ages|', 'Guessing Game Mode |9 and above|', 'Adventure Mode |12 and above|']);
-                var gamemode = this.lastAnswer;
-                if (String(gamemode) === 'Puzzle Mode |All Ages|') {
-                    this.writeText('==================================================');
-                    this.writeText('    WELCOME TO PUZZLE MODE!');
-                    this.writeText('==================================================');
-                    this.writeText('    ____  _   _ ____________    ______');
-                    this.writeText('   / __ \\/ | / /_  /_  /_  /   / ____/');
-                    this.writeText('  / /_/ /  |/ / / / / / / /   / __/   ');
-                    this.writeText(' / ____/ /|  / / / / / / /___/ /___   ');
-                    this.writeText('/_/   /_/ |_/ /_/ /_/ /_____/_____/   ');
-                    this.writeText('|================================================================================================================================================================================|');
-                    this.writeText(' ');
-                    this.writeText('PUZZLE TIME!');
-                    this.lastAnswer = await this.showChoices('Pick One! More Coming Soon!', ['Math!']);
-                    var q41 = this.lastAnswer;
-                    if (String(q41) === 'Math!') {
-                        this.lastAnswer = await this.showChoices('Time for math! Choose Your Difficulty! 1 = easiest 10 = hardest', ['|1| Pre-School', '|2| First-Grade', '|3| Second-Grade', '|5| Fifth-Grade', '|8| Eighth-Grade', '|10| Albert Einstein']);
-                        var q42 = this.lastAnswer;
-                        if (String(q42) === '|1| Pre-School') {
-                            this.writeText('Welcome to Pre-School Math! Super easy stuff!');
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 1: What is 1 + 1 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '2') {
-                                this.writeText('Correct! Nice job!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('2')) {
-                                this.writeText('Oops thats a little too high! The answer was 2');
-                            }
-                            if (parseInt(guess) < parseInt('2')) {
-                                this.writeText('Oops thats a little too small! The answer was 2');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 2: What is 2 + 3 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '5') {
-                                this.writeText('Correct! You are doing great!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('5')) {
-                                this.writeText('Too high! The answer was 5');
-                            }
-                            if (parseInt(guess) < parseInt('5')) {
-                                this.writeText('Too low! The answer was 5');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 3: What is 5 + 5 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '10') {
-                                this.writeText('Perfect! You finished Pre-School Math!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 100);
-                                await this.beep(1047, 300);
-                            }
-                            if (parseInt(guess) > parseInt('10')) {
-                                this.writeText('Too high! The answer was 10');
-                            }
-                            if (parseInt(guess) < parseInt('10')) {
-                                this.writeText('Too low! The answer was 10');
-                            }
-                            this.lastAnswer = await this.askQuestion('That is the end of Pre-School math! Try First-Grade next!');
-                        }
-                        if (String(q42) === '|2| First-Grade') {
-                            this.writeText('Welcome to First-Grade Math! A little harder!');
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 1: What is 7 + 8 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '15') {
-                                this.writeText('Correct! Great job!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('15')) {
-                                this.writeText('Too high! The answer was 15');
-                            }
-                            if (parseInt(guess) < parseInt('15')) {
-                                this.writeText('Too low! The answer was 15');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 2: What is 12 + 9 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '21') {
-                                this.writeText('Correct! Keep it up!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('21')) {
-                                this.writeText('Too high! The answer was 21');
-                            }
-                            if (parseInt(guess) < parseInt('21')) {
-                                this.writeText('Too low! The answer was 21');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 3: What is 15 - 6 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '9') {
-                                this.writeText('Perfect! You finished First-Grade Math!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 100);
-                                await this.beep(1047, 300);
-                            }
-                            if (parseInt(guess) > parseInt('9')) {
-                                this.writeText('Too high! The answer was 9');
-                            }
-                            if (parseInt(guess) < parseInt('9')) {
-                                this.writeText('Too low! The answer was 9');
-                            }
-                            this.lastAnswer = await this.askQuestion('That is the end of First-Grade math! Try Second-Grade next!');
-                        }
-                        if (String(q42) === '|3| Second-Grade') {
-                            this.writeText('Welcome to Second-Grade Math! Multiplication time!');
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 1: What is 6 x 4 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '24') {
-                                this.writeText('Correct! Awesome!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('24')) {
-                                this.writeText('Too high! The answer was 24');
-                            }
-                            if (parseInt(guess) < parseInt('24')) {
-                                this.writeText('Too low! The answer was 24');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 2: What is 7 x 8 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '56') {
-                                this.writeText('Correct! You know your times tables!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('56')) {
-                                this.writeText('Too high! The answer was 56');
-                            }
-                            if (parseInt(guess) < parseInt('56')) {
-                                this.writeText('Too low! The answer was 56');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 3: What is 9 x 9 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '81') {
-                                this.writeText('Perfect! You finished Second-Grade Math!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 100);
-                                await this.beep(1047, 300);
-                            }
-                            if (parseInt(guess) > parseInt('81')) {
-                                this.writeText('Too high! The answer was 81');
-                            }
-                            if (parseInt(guess) < parseInt('81')) {
-                                this.writeText('Too low! The answer was 81');
-                            }
-                            this.lastAnswer = await this.askQuestion('That is the end of Second-Grade math! Try Fifth-Grade next!');
-                        }
-                        if (String(q42) === '|5| Fifth-Grade') {
-                            this.writeText('Welcome to Fifth-Grade Math! Division and bigger numbers!');
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 1: What is 144 / 12 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '12') {
-                                this.writeText('Correct! Division master!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('12')) {
-                                this.writeText('Too high! The answer was 12');
-                            }
-                            if (parseInt(guess) < parseInt('12')) {
-                                this.writeText('Too low! The answer was 12');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 2: What is 25 x 25 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '625') {
-                                this.writeText('Correct! Big brain time!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('625')) {
-                                this.writeText('Too high! The answer was 625');
-                            }
-                            if (parseInt(guess) < parseInt('625')) {
-                                this.writeText('Too low! The answer was 625');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 3: What is 1000 - 357 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '643') {
-                                this.writeText('Perfect! You finished Fifth-Grade Math!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 100);
-                                await this.beep(1047, 300);
-                            }
-                            if (parseInt(guess) > parseInt('643')) {
-                                this.writeText('Too high! The answer was 643');
-                            }
-                            if (parseInt(guess) < parseInt('643')) {
-                                this.writeText('Too low! The answer was 643');
-                            }
-                            this.lastAnswer = await this.askQuestion('That is the end of Fifth-Grade math! Try Eighth-Grade next!');
-                        }
-                        if (String(q42) === '|8| Eighth-Grade') {
-                            this.writeText('Welcome to Eighth-Grade Math! Algebra and exponents!');
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 1: What is 2 to the power of 8? (2^8) = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '256') {
-                                this.writeText('Correct! Exponent expert!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('256')) {
-                                this.writeText('Too high! The answer was 256');
-                            }
-                            if (parseInt(guess) < parseInt('256')) {
-                                this.writeText('Too low! The answer was 256');
-                            }
-                            this.writeText(' ');
-                            this.writeText('Algebra Time! Solve for x:');
-                            this.lastAnswer = await this.askQuestion('Question 2: If 3x + 7 = 22, what is x = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '5') {
-                                this.writeText('Correct! Algebra ace!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('5')) {
-                                this.writeText('Too high! The answer was 5 (3*5 + 7 = 22)');
-                            }
-                            if (parseInt(guess) < parseInt('5')) {
-                                this.writeText('Too low! The answer was 5 (3*5 + 7 = 22)');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 3: What is the square root of 169 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '13') {
-                                this.writeText('Perfect! You finished Eighth-Grade Math!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 100);
-                                await this.beep(1047, 300);
-                            }
-                            if (parseInt(guess) > parseInt('13')) {
-                                this.writeText('Too high! The answer was 13');
-                            }
-                            if (parseInt(guess) < parseInt('13')) {
-                                this.writeText('Too low! The answer was 13');
-                            }
-                            this.lastAnswer = await this.askQuestion('That is the end of Eighth-Grade math! Try Albert Einstein mode if you dare!');
-                        }
-                        if (String(q42) === '|10| Albert Einstein') {
-                            this.writeText('==================================================');
-                            this.writeText('   ALBERT EINSTEIN MODE - GENIUS LEVEL');
-                            this.writeText('==================================================');
-                            this.writeText('Only true mathematicians can solve these!');
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 1: What is 17 squared? (17^2) = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '289') {
-                                this.writeText('Impressive! Einstein would be proud!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('289')) {
-                                this.writeText('Too high! The answer was 289');
-                            }
-                            if (parseInt(guess) < parseInt('289')) {
-                                this.writeText('Too low! The answer was 289');
-                            }
-                            this.writeText(' ');
-                            this.writeText('Hard algebra incoming!');
-                            this.lastAnswer = await this.askQuestion('Question 2: If 5x - 3 = 2x + 18, what is x = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '7') {
-                                this.writeText('Genius! You solved it!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 200);
-                            }
-                            if (parseInt(guess) > parseInt('7')) {
-                                this.writeText('Too high! The answer was 7 (5*7 - 3 = 32, 2*7 + 18 = 32)');
-                            }
-                            if (parseInt(guess) < parseInt('7')) {
-                                this.writeText('Too low! The answer was 7');
-                            }
-                            this.writeText(' ');
-                            this.lastAnswer = await this.askQuestion('Question 3: What is 12 cubed? (12^3) = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '1728') {
-                                this.writeText('INCREDIBLE! You are a math genius!');
-                                await this.beep(523, 100);
-                                await this.beep(659, 100);
-                                await this.beep(784, 100);
-                                await this.beep(1047, 100);
-                                await this.beep(1319, 300);
-                            }
-                            if (parseInt(guess) > parseInt('1728')) {
-                                this.writeText('Too high! The answer was 1728');
-                            }
-                            if (parseInt(guess) < parseInt('1728')) {
-                                this.writeText('Too low! The answer was 1728');
-                            }
-                            this.writeText(' ');
-                            this.writeText('FINAL BOSS QUESTION!');
-                            this.lastAnswer = await this.askQuestion('Question 4: What is 2^10 = ?');
-                            var guess = this.lastAnswer;
-                            if (String(guess) === '1024') {
-                                this.writeText('==================================================');
-                                this.writeText('   YOU ARE A TRUE MATH GENIUS!!!');
-                                this.writeText('   EINSTEIN WOULD BE PROUD!');
-                                this.writeText('==================================================');
-                                await this.beep(523, 150);
-                                await this.beep(659, 150);
-                                await this.beep(784, 150);
-                                await this.beep(1047, 150);
-                                await this.beep(1319, 150);
-                                await this.beep(1568, 400);
-                            }
-                            if (parseInt(guess) > parseInt('1024')) {
-                                this.writeText('Too high! The answer was 1024');
-                            }
-                            if (parseInt(guess) < parseInt('1024')) {
-                                this.writeText('Too low! The answer was 1024');
-                            }
-                            this.lastAnswer = await this.askQuestion('You completed Albert Einstein mode! You are officially a genius!');
-                        }
-                    }
-                    this.lastAnswer = await this.askQuestion('Thanks for playing Puzzle Mode! Come back for more puzzles soon!');
-                    return; // Exit the game
-                }
-                if (String(gamemode) === 'Adventure Mode |12 and above|') {
-                    this.writeText('==================================================');
-                    this.writeText('    WELCOME TO ADVENTURE MODE!');
-                    this.writeText('==================================================');
-                    this.writeText('                               __________________      ___________________           /\\         ___________      __________________');
-                    this.writeText('                              |                               |                     /  \\        |         |              |');
-                    this.writeText('                              |                               |                    /    \\       |         |              |');
-                    this.writeText('                              |__________________             |                   /      \\      |_________|              |');
-                    this.writeText('                                                 |            |                  /________\\     |          \\             |');
-                    this.writeText('                                                 |            |                 /          \\    |           \\            |');
-                    this.writeText('                               __________________|            |                /            \\   |            \\           |');
-                    this.writeText('|================================================================================================================================================================================|');
-                    this.writeText(' ');
-                    this.lastAnswer = await this.showChoices('You embark on your adventure choose a difficulty!', ['Easy', 'Normal', 'Hard']);
-                    var q16 = this.lastAnswer;
-                    if (String(q16) === 'Easy') {
-                        this.lastAnswer = await this.showChoices('You begin your adventure where shall you begin? Numbers next to the areas mean the difficulty. 1 is easiest, 10 is hardest.If your game is over reload the page to restart!', ['|1| Village', '|3| Forest', '|5| Caves', '|7| Sky', '|10| Hell']);
-                        var q17 = this.lastAnswer;
-                        this.lastAnswer = String(Math.floor(Math.random() * (18 - 18 + 1)) + 18);
-                        var secretNumber = this.lastAnswer;
-                        if (String(q17) === '|1| Village') {
-                            this.lastAnswer = await this.askQuestion('First of all how old are you?');
-                            var guess = this.lastAnswer;
-                            if (parseInt(guess) > parseInt('secretNumber')) {
-                                this.lastAnswer = await this.showChoices('You wake up on a sunny day. Its Monday and you have to go to work but you dont wanna go. What do you tell your boss?', ['|Lie| I am feeling sick *Fake Cough*', '|Truth| Hey Mr.NiceGuy, I am not in a good mood today. Could I skip work?']);
-                                var q18 = this.lastAnswer;
-                                if (String(q18) === '|Lie| I am feeling sick *Fake Cough*') {
-                                    this.writeText('Never Lie! Your boss denies your request and fires you. Game');
-                                    return; // Exit the game
-                                }
-                                if (String(q18) === '|Truth| Hey Mr.NiceGuy, I am not in a good mood today. Could I skip work?') {
-                                    this.writeText('Always Tell the Truth! Mr.NiceGuy lets you skip work today so you get a good rest! :D');
-                                }
-                            }
-                            if (String(guess) === String(secretNumber)) {
-                                this.lastAnswer = await this.showChoices('You wake up on a sunny day. Its Monday and you have to go to work but you dont wanna go. What do you tell your boss?', ['|Lie| I am feeling sick *Fake Cough*', '|Truth| Hey Mr.NiceGuy, I am not in a good mood today. Could I skip work?']);
-                                var q18 = this.lastAnswer;
-                                if (String(q18) === '|Lie| I am feeling sick *Fake Cough*') {
-                                    this.writeText('Never Lie! Your boss denies your request and fires you. Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q18) === '|Truth| Hey Mr.NiceGuy, I am not in a good mood today. Could I skip work?') {
-                                    this.writeText('Always Tell the Truth! Mr.NiceGuy lets you skip work today so you get a good rest! :D');
-                                }
-                            }
-                            if (parseInt(guess) < parseInt('secretNumber')) {
-                                this.lastAnswer = await this.showChoices('You wake up on a sunny day. Its Monday and you have to go to school but you dont wanna go. What do you tell your Mom?', ['|Lie| I am feeling sick Mom *Fake Cough*', '|Truth| Hey Mom, I am not in a good mood today. Could I skip school?']);
-                                var q19 = this.lastAnswer;
-                                if (String(q19) === '|Lie| I am feeling sick Mom *Fake Cough*') {
-                                    this.writeText('Never Lie! Your Mom never trusts you again even when you\'re telling the truth. Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q19) === '|Truth| Hey Mom, I am not in a good mood today. Could I skip school?') {
-                                    this.writeText('Always Tell the Truth! Mom doesnt let you skip school but you kept your trust :D');
-                                }
-                            }
-                        }
-                        if (String(q17) === '|3| Forest') {
-                            this.lastAnswer = await this.showChoices('You are going on a hike with your friends and you stumble upon a Grizzly Bear on a cliff you are cornered what do you?', ['Run', 'Make yourselves look bigger', 'Jump off cliff']);
-                            var q19 = this.lastAnswer;
-                            if (String(q19) === 'Run') {
-                                this.writeText('You try to run past the bear you escape but the bear starts the chase and wins... Atleast your friends survived! Game Over');
-                                return; // Exit the game
-                            }
-                            if (String(q19) === 'Make yourselves look bigger') {
-                                this.writeText('This is the Most effective! You worked together to make yourselves look giant compared to the Grizzy it runs away scared. You survive!');
-                            }
-                            if (String(q19) === 'Jump off cliff') {
-                                this.lastAnswer = await this.showChoices('You are falling what do you do?', ['Scream and Accept your fate', 'Attempt to hold on to objects around you', 'Stay calm and set your legs to absorb most of the impact']);
-                                var q20 = this.lastAnswer;
-                                if (String(q20) === 'Scream and Accept your fate') {
-                                    this.writeText('You might have considered TRYING. Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q20) === 'Attempt to hold on to objects around you') {
-                                    this.writeText('You slow yourselves down enough to survive the fall injured but alive.');
-                                }
-                                if (String(q20) === 'Stay calm and set your legs to absorb most of the impact') {
-                                    this.writeText('Would have worked but you got unlucky and bounced of the ground towards a sharp rock headfirst... It wasnt pretty. Game Over');
-                                    return; // Exit the game
-                                }
-                            }
-                        }
-                        if (String(q17) === '|5| Caves') {
-                            this.lastAnswer = await this.showChoices('You are mining for gold deep in the caves. So far you\'ve gotten so much! But after mining another piece of gold you find a hole leading to a new cave. Do you go inside?', ['Yes', 'No']);
-                            var q21 = this.lastAnswer;
-                            if (String(q21) === 'No') {
-                                this.lastAnswer = await this.askQuestion('Well you saved yourself the trouble...');
-                                this.lastAnswer = await this.askQuestion('AND LOST THE FUN >:C');
-                            }
-                            if (String(q21) === 'Yes') {
-                                this.lastAnswer = await this.showChoices('You go inside and see a treasure chest at the end of the cave mysteriously illuminated by what seems like nothing. Do you open it?', ['Yes', 'No']);
-                                var q22 = this.lastAnswer;
-                                if (String(q22) === 'Yes') {
-                                    this.writeText('Your greed got the best of you. It was booby trapped and you fall onto sharp spikes... Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q22) === 'No') {
-                                    this.writeText('You are content with the amount of gold you currently have and go back to where you came from happy :D');
-                                }
-                            }
-                        }
-                        if (String(q17) === '|7| Sky') {
-                            this.lastAnswer = await this.showChoices('You have been invited to fight against the Legendary Serpent called the Basilisk in Mount Olympus\'s gladiator arena! You get to choose 1 weapon. Which one do you choose?', ['Sword', 'Shield', 'Bow']);
-                            var q23 = this.lastAnswer;
-                            if (String(q23) === 'Sword') {
-                                this.writeText('Great pick! You are able to get to the top of the Basilisk\'s head and attack its eyes! Now it cant see so it cant petrify you! You slice off its head and win the battle! What do you get? Nothing just more ego...');
-                            }
-                            if (String(q23) === 'Shield') {
-                                this.writeText('Good idea, now you can avoid petrification! But how will you attack? At one point after your shield takes enough hits it breaks then you stand no chance... Game Over');
-                                return; // Exit the game
-                            }
-                            if (String(q23) === 'Bow') {
-                                this.writeText('You dont know how to use a bow soooooooo. GAME OVER');
-                                return; // Exit the game
-                            }
-                        }
-                        if (String(q17) === '|10| Hell') {
-                            this.lastAnswer = await this.showChoices('You one day wake up in Hades\'s arena with nothing other than your clothes. Cerberus the Giant 3 Headed Dog is about to be released! What will you do?', ['Run Away', 'Fight', 'Throw Your Shoe Away']);
-                            var q24 = this.lastAnswer;
-                            if (String(q24) === 'Run Away') {
-                                this.writeText('You\'re up against a giant 3 Headed Dog. It\'s bigger and faster than you. He squishes you like a bug... Game OVER');
-                                return; // Exit the game
-                            }
-                            if (String(q24) === 'Fight') {
-                                this.writeText('You use your fists but you have not worked out for years so your punch does nothing and you get stomped on... Game OVER');
-                                return; // Exit the game
-                            }
-                            if (String(q24) === 'Throw Your Shoe Away') {
-                                this.writeText('He may be a giant 3 headed devil dog but he\'s still a dog! You throw your shoe and he goes after it like a game of fetch, allowing you to escape through the path of destruction as you realize theres no way back...');
-                            }
-                        }
-                    }
-                    if (String(q16) === 'Normal') {
-                        this.lastAnswer = await this.showChoices('You begin your adventure! Numbers mean difficulty 1 is easiest  10 is hardest. Reload if you lose!', ['|3| Carnival', '|5| Jungle', '|10| Volcano Island']);
-                        var q26 = this.lastAnswer;
-                        if (String(q26) === '|3| Carnival') {
-                            this.lastAnswer = await this.showChoices('One day you walk into a Carnival ready for fun. You play a game and you think its rigged. What do you do?', ['Complain', 'Break Open The Game', 'Ask For Refund']);
-                            var q27 = this.lastAnswer;
-                            if (String(q27) === 'Complain') {
-                                this.writeText('You get kicked out of the park for being rude. Game Over');
-                                return; // Exit the game
-                            }
-                            if (String(q27) === 'Break Open The Game') {
-                                this.writeText('You break it open then you find out that it truly was rigged! You report them to the police and get your money back. Victory!');
-                            }
-                            if (String(q27) === 'Ask For Refund') {
-                                this.writeText('The Park Owner says \'*Gasp* Are you accusing me?! I will have to ask you to LEAVE THE PARK.\' Game Over');
-                                return; // Exit the game
-                            }
-                        }
-                        if (String(q26) === '|5| Jungle') {
-                            this.lastAnswer = await this.showChoices('You are exploring the vast jungle with your cat to find a treasure chest... Eventually you find one but it is NOT on the map. Do you open it?', ['Yes', 'No']);
-                            var q28 = this.lastAnswer;
-                            if (String(q28) === 'Yes') {
-                                this.writeText('You open it then a Leopard jumps at you and eats you... It had nothing to do with the treasure, just your bad luck! Atleast the cat escaped! Game Over');
-                                return; // Exit the game
-                            }
-                            if (String(q28) === 'No') {
-                                this.lastAnswer = await this.showChoices('You continue then find a Leopard! What do you do?', ['Throw your cat at the Leopard', 'Run Away', 'Scream In Fear']);
-                                var q29 = this.lastAnswer;
-                                if (String(q29) === 'Throw your cat at the Leopard') {
-                                    this.writeText('The Leopard hasnt eaten for a week so he eats the cat then you... Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q29) === 'Run Away') {
-                                    this.writeText('You cant outrun a Leopard! It catches up and... well lets just say you didnt make it. Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q29) === 'Scream In Fear') {
-                                    this.writeText('The Leopard cant stand the noise you make! Neither can your cat! The leopard runs away scared. You survive!');
-                                }
-                            }
-                        }
-                        if (String(q26) === '|10| Volcano Island') {
-                            this.lastAnswer = await this.showChoices('You are on top of an erupting volcano! It will fully erupt in 1 minute! What do you do?', ['Run Away', 'Jump In', 'Fart']);
-                            var q30 = this.lastAnswer;
-                            if (String(q30) === 'Run Away') {
-                                this.writeText('You start running down the volcano but you slip and hit your head on a hard rock super fast... Game Over');
-                                return; // Exit the game
-                            }
-                            if (String(q30) === 'Jump In') {
-                                this.writeText('You died and won the Darwin Awards! Congratulations? Game Over');
-                                return; // Exit the game
-                            }
-                            if (String(q30) === 'Fart') {
-                                this.writeText('You fart as soon as the volcano erupts and the gas is so strong and loud it creates a methane cloud that redirects the lava! You survive barely! Doesnt stop ash and smoke from going into the air though!');
-                            }
-                        }
-                    }
-                    if (String(q16) === 'Hard') {
-                        this.lastAnswer = await this.showChoices('HARD MODE! These adventures will test your wits! Choose wisely...', ['|7| Time Travel', '|8| Dream World', '|9| Shrunk Down']);
-                        var q31 = this.lastAnswer;
-                        if (String(q31) === '|7| Time Travel') {
-                            this.writeText('You found a mysterious pocket watch that glows...');
-                            this.lastAnswer = await this.showChoices('You accidentally activated a time machine! You travel back to 1912. You see the Titanic about to depart. What do you do?', ['Warn Everyone About The Iceberg', 'Get On The Ship Anyway', 'Try To Fix The Watch']);
-                            var q32 = this.lastAnswer;
-                            if (String(q32) === 'Warn Everyone About The Iceberg') {
-                                this.lastAnswer = await this.showChoices('Nobody believes you! Theyre calling you crazy. What now?', ['Steal a lifeboat and wait', 'Pull the fire alarm', 'Give up and leave']);
-                                var q33 = this.lastAnswer;
-                                if (String(q33) === 'Steal a lifeboat and wait') {
-                                    this.writeText('You wait in the lifeboat. When the ship sinks, you save 20 people! Youre a hero but stuck in 1912 forever... Bittersweet Victory!');
-                                }
-                                if (String(q33) === 'Pull the fire alarm') {
-                                    this.writeText('Everyone evacuates! The ship is delayed for inspection. The iceberg passes! You changed history... but now the timeline is unstable! You vanish from existence. Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q33) === 'Give up and leave') {
-                                    this.writeText('You walk away knowing what will happen. The guilt haunts you forever. Bad Ending');
-                                    return; // Exit the game
-                                }
-                            }
-                            if (String(q32) === 'Get On The Ship Anyway') {
-                                this.writeText('You already know where the iceberg is! You enjoy the trip and position yourself near a lifeboat. You survive and become a famous survivor! But youre stuck in 1912... Victory?');
-                            }
-                            if (String(q32) === 'Try To Fix The Watch') {
-                                this.lastAnswer = await this.showChoices('The watch sparks! You can travel again but its unstable. Where do you go?', ['1 Million Years Ago', '100 Years Into The Future', 'Back To Present']);
-                                var q34 = this.lastAnswer;
-                                if (String(q34) === '1 Million Years Ago') {
-                                    this.writeText('You appear in front of a T-Rex. It looks hungry. You dont even have time to scream... Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q34) === '100 Years Into The Future') {
-                                    this.writeText('You arrive in 2112! Flying cars, robot friends, and pizza that never gets cold! You decide to stay. Perfect Victory!');
-                                }
-                                if (String(q34) === 'Back To Present') {
-                                    this.writeText('You made it home! But... everything looks slightly different. Your dog is now a cat. Close enough! Victory!');
-                                }
-                            }
-                        }
-                        if (String(q31) === '|8| Dream World') {
-                            this.writeText('You fall asleep and wake up in a world where nothing makes sense...');
-                            this.lastAnswer = await this.showChoices('A talking fish offers you three doors. Which do you choose?', ['The Door Made of Cheese', 'The Door Thats Upside Down', 'The Door That Doesnt Exist']);
-                            var q35 = this.lastAnswer;
-                            if (String(q35) === 'The Door Made of Cheese') {
-                                this.lastAnswer = await this.showChoices('You enter a world where gravity is sideways! Everything is falling left. What do you grab onto?', ['A Flying Toaster', 'A Giant Spoon', 'Nothing - Enjoy The Ride']);
-                                var q36 = this.lastAnswer;
-                                if (String(q36) === 'A Flying Toaster') {
-                                    this.writeText('The toaster takes you to Breakfast Land! You become the King of Pancakes! Delicious Victory!');
-                                }
-                                if (String(q36) === 'A Giant Spoon') {
-                                    this.writeText('The spoon launches you into a bowl of soup. You swim to safety and wake up. Just a dream... Or was it?');
-                                }
-                                if (String(q36) === 'Nothing - Enjoy The Ride') {
-                                    this.writeText('You fall forever. This is your life now. You eventually learn to like it. Weird Victory?');
-                                }
-                            }
-                            if (String(q35) === 'The Door Thats Upside Down') {
-                                this.lastAnswer = await this.showChoices('You walk on the ceiling! A penguin in a top hat asks you a riddle: What has keys but no locks? Answer:', ['A Piano', 'A Keyboard', 'A Map']);
-                                var q37 = this.lastAnswer;
-                                if (String(q37) === 'A Piano') {
-                                    this.writeText('CORRECT! The penguin gives you wings! You fly through the dream and wake up feeling amazing! Victory!');
-                                }
-                                if (String(q37) === 'A Keyboard') {
-                                    this.writeText('CORRECT! The penguin gives you the power of typing really fast! Not useful here but cool! Victory!');
-                                }
-                                if (String(q37) === 'A Map') {
-                                    this.writeText('WRONG! The penguin turns into a giant eraser and erases you from the dream. Game Over');
-                                    return; // Exit the game
-                                }
-                            }
-                            if (String(q35) === 'The Door That Doesnt Exist') {
-                                this.writeText('You walk through nothing into nothing. You become one with the void. Somehow... this is peaceful. Enlightened Ending!');
-                            }
-                        }
-                        if (String(q31) === '|9| Shrunk Down') {
-                            this.writeText('ZZZZAP! A shrink ray hits you! Youre now the size of an ant in your own backyard!');
-                            this.lastAnswer = await this.showChoices('A massive ant approaches you! It looks curious. What do you do?', ['Try To Communicate', 'Run For Your Life', 'Challenge It To A Fight']);
-                            var q38 = this.lastAnswer;
-                            if (String(q38) === 'Try To Communicate') {
-                                this.lastAnswer = await this.showChoices('The ant understands you! It offers to take you to the Queen. Do you accept?', ['Yes Take Me To Your Leader', 'No Thanks', 'Only If Theres Snacks']);
-                                var q39 = this.lastAnswer;
-                                if (String(q39) === 'Yes Take Me To Your Leader') {
-                                    this.writeText('The Queen is impressed by you! She makes you an honorary ant and you lead an army of ants to find the unshrink ray! Victory!');
-                                }
-                                if (String(q39) === 'No Thanks') {
-                                    this.writeText('The ant shrugs and leaves. Youre alone in a giant world. You eventually find a crumb and make it your house. Tiny Victory!');
-                                }
-                                if (String(q39) === 'Only If Theres Snacks') {
-                                    this.writeText('The ant brings you to a sugar cube the size of a house! You eat like a king! The ants love you! Sweet Victory!');
-                                }
-                            }
-                            if (String(q38) === 'Run For Your Life') {
-                                this.lastAnswer = await this.showChoices('You run but trip on a blade of grass! A shadow looms over you - its a BIRD! What do you do?', ['Play Dead', 'Scream Really Loud', 'Wave Your Arms']);
-                                var q40 = this.lastAnswer;
-                                if (String(q40) === 'Play Dead') {
-                                    this.writeText('The bird isnt fooled. Birds eat bugs all the time. You become bird food. Game Over');
-                                    return; // Exit the game
-                                }
-                                if (String(q40) === 'Scream Really Loud') {
-                                    this.writeText('Your tiny scream is actually at a frequency that hurts the birds ears! It flies away! You survive!');
-                                }
-                                if (String(q40) === 'Wave Your Arms') {
-                                    this.writeText('The bird thinks youre a weird bug and decides youre not worth eating. Lucky! You survive!');
-                                }
-                            }
-                            if (String(q38) === 'Challenge It To A Fight') {
-                                this.writeText('You square up against an ant 20 times your size. The ant flicks you into a puddle. You drown. Game Over');
-                                return; // Exit the game
-                            }
-                        }
-                    }
-                    this.writeText('You have completed your Adventure! Which path will you choose next?');
-                    this.writeText('Reload to Start from the beginning! :D');
-                    return; // Exit the game
-                }
-                if (String(gamemode) === 'Guessing Game Mode |9 and above|') {
-                    this.writeText('==================================================');
-                    this.writeText('    WELCOME TO GUESSING GAME MODE!');
-                    this.writeText('==================================================');
-                    this.writeText('                               __________________      ___________________           /\\         ___________      __________________');
-                    this.writeText('                              |                               |                     /  \\        |         |              |');
-                    this.writeText('                              |                               |                    /    \\       |         |              |');
-                    this.writeText('                              |__________________             |                   /      \\      |_________|              |');
-                    this.writeText('                                                 |            |                  /________\\     |          \\             |');
-                    this.writeText('                                                 |            |                 /          \\    |           \\            |');
-                    this.writeText('                               __________________|            |                /            \\   |            \\           |');
-                    this.writeText('|================================================================================================================================================================================|');
-                    this.writeText(' ');
-                    this.writeText('WELCOME TO THE GUESSING GAME!!! TA DAAAAAAAAAAA');
-                    this.lastAnswer = await this.askQuestion('Pretty boring right?');
-                    this.lastAnswer = await this.showChoices('Well this what is gonna happen there will be a certain amount rounds depending on difficulty and each round will give you a certain amount of points |Points symbol is this $| the most money able to be earned will be shown Good Luck!', ['Easy', 'Normal', 'Hard', 'Impossible', '☠ C̷U̶R̵S̴E̷D̶ ☠']);
-                    var q25 = this.lastAnswer;
-                    if (String(q25) === 'Easy') {
-                        this.lastAnswer = await this.askQuestion('All rounds points together you can get 1,600$! Reply to start!');
-                        this.lastAnswer = String(Math.floor(Math.random() * (5 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 1!!! My number is between 1 and 5! This round is worth 100$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 100$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 100$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 100$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = String(Math.floor(Math.random() * (10 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.writeText('Get Ready!');
-                        this.lastAnswer = await this.askQuestion('Round 2!!! My number is between 1 and 10! This round is worth 500$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 500$ more!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 500$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 500$ sure sucks to be you!');
-                        }
-                        this.writeText('Get Ready For!');
-                        this.lastAnswer = String(Math.floor(Math.random() * (25 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 3!!! My number is between 1 and 25! This round is worth 1,000$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 1,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 1,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 1,000$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = await this.askQuestion('Well thats the end of Easy! Come Back Again!');
-                    }
-                    if (String(q25) === 'Normal') {
-                        this.lastAnswer = await this.askQuestion('Welcome to Normal! You can win 17,500$! Reply to start!');
-                        this.lastAnswer = String(Math.floor(Math.random() * (50 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.writeText('Get Ready!');
-                        this.lastAnswer = await this.askQuestion('Round 1!!! My number is between 1 and 50! This round is worth 2,500$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 2,500$ more!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 2,500$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 2,500$ sure sucks to be you!');
-                        }
-                        this.writeText('Get Ready!');
-                        this.lastAnswer = String(Math.floor(Math.random() * (100 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 2!!! My number is between 1 and 100! This round is worth 5,000$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 5,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 5,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 5,000$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = String(Math.floor(Math.random() * (250 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.writeText('Get Ready!');
-                        this.lastAnswer = await this.askQuestion('Round 3!!! My number is between 1 and 250! This round is worth 10,000$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 10,000$ more!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 10,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 10,000$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = await this.askQuestion('Thats all for Normal Mode! Come Back Again!');
-                    }
-                    if (String(q25) === 'Hard') {
-                        this.writeText('Welcome to HARD you can win 175,000$');
-                        this.lastAnswer = String(Math.floor(Math.random() * (500 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 1!!! My number is between 1 and 500! This round is worth 50,000$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 50,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 50,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 50,000$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = String(Math.floor(Math.random() * (1000 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.writeText('Get Ready!');
-                        this.lastAnswer = await this.askQuestion('Round 2!!! My number is between 1 and 1000! This round is worth 50,000$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 50,000$ more!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 50,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 50,000$ sure sucks to be you!');
-                        }
-                        this.writeText('Get Ready For!');
-                        this.lastAnswer = String(Math.floor(Math.random() * (2500 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 3!!! My number is between 1 and 2500! This round is worth 75,000$!!!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 75,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 75,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 75,000$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = await this.askQuestion('Thanks for playing hard mode come back again!');
-                    }
-                    if (String(q25) === 'Impossible') {
-                        this.lastAnswer = await this.askQuestion('Welcome to Impossible you can win 750,000$! Reply to start!');
-                        this.lastAnswer = String(Math.floor(Math.random() * (5000 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 1!!! My number is between 1 and 5000 take a Guess!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 250,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 250,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 250,000$ sure sucks to be you!');
-                        }
-                        this.writeText('Get Ready For...');
-                        this.lastAnswer = String(Math.floor(Math.random() * (10000 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 2!!! My number is between 1 and 10000 take a Guess!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 250,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 250,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 250,000$ sure sucks to be you!');
-                        }
-                        this.writeText('Get Ready For...');
-                        this.lastAnswer = String(Math.floor(Math.random() * (25000 - 1 + 1)) + 1);
-                        var secretNumber = this.lastAnswer;
-                        this.lastAnswer = await this.askQuestion('Round 3!!! My number is between 1 and 25000 take a Guess!');
-                        var guess = this.lastAnswer;
-                        if (String(guess) === String(secretNumber)) {
-                            this.writeText('It indeed was ' + secretNumber + '!!!!! You win 250,000$!!!');
-                        }
-                        if (parseInt(guess) < parseInt('secretNumber')) {
-                            this.writeText('Too Low! The secret number was ' + secretNumber + ' You lost your chance at 250,000$ sure sucks to be you!');
-                        }
-                        if (parseInt(guess) > parseInt('secretNumber')) {
-                            this.writeText('Too high! The secret number was ' + secretNumber + ' You lost your chance at 250,000$ sure sucks to be you!');
-                        }
-                        this.lastAnswer = await this.askQuestion('Well thats all for IMPOSSIBLE!!! Come back again!');
-                    }
-                    if (String(q25) === '☠ C̷U̶R̵S̴E̷D̶ ☠') {
-                        this.writeText('░▒▓█ Y̸O̷U̴ H̵A̶V̷E̴ E̵N̶T̷E̴R̵E̶D̷ T̴H̵E̶ V̷O̴I̵D̶ █▓▒░');
-                        this.writeText('⛧ ☠ ⛧ ☠ ⛧ ☠ ⛧ ☠ ⛧ ☠ ⛧ ☠ ⛧ ☠ ⛧');
-                        this.lastAnswer = await this.askQuestion('̷̧W̶̡H̵̢A̴̧T̷̨ ̶̧I̵̢Ş̴ ̷̨Y̶̧O̵̢U̴̧R̷̨ ̶̧N̵̢A̴̧M̷̨Ȩ̶?̵̢');
-                        var cursedName = this.lastAnswer;
-                        this.writeText('⸸ ' + cursedName + ' ⸸');
-                        this.writeText('... T̷H̶E̵ ̴V̷O̶I̵D̴ ̷K̶N̵O̴W̷S̶ ̵Y̴O̷U̶ ...');
-                        this.lastAnswer = await this.askQuestion('☠ G̷U̶E̵S̴S̷ ̶T̵H̴E̷ ̶N̵U̴M̷B̶E̵R̴ ☠ 1 - 666,666,666,666');
-                        var guess = this.lastAnswer;
-                        var voidResult = '"fail"';
-                        if (String(guess) === '67') {
-                            var voidResult = '"win"';
-                            this.writeText('⛧⛧⛧ I̷M̶P̵O̴S̷S̶I̵B̴L̷E̶ ⛧⛧⛧');
-                            this.writeText('░▒▓█ Y̸O̷U̴ H̵A̶V̷E̴ A̵S̶C̷E̴N̵D̶E̷D̴ █▓▒░');
-                            this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴ ̷B̶O̵W̴S̷ ̶T̵O̴ ̷Y̶O̵U̴ ☠');
-                            this.writeText('⸸ Y̷O̶U̵ ̴K̷N̶O̵W̴ ̷T̶H̵E̴ ̷S̶A̵C̴R̷E̶D̵ ̴N̷U̶M̵B̴E̷R̶... ̵6̴7̷ ⸸');
-                        }
-                        if (String(voidResult) === 'fail') {
-                            this.writeText('⸸ W̷H̶E̵N̴ ̷I̶N̵ ̴D̷O̶U̵B̴T̷... ̶S̵A̴Y̷ ̶6̵7̴... ⸸');
-                            this.writeText('☠ T̷H̶E̵ ̴V̷O̶I̵D̴\'̷S̶ ̵N̴U̷M̶B̵E̴R̷ ̶I̵S̴ ̷A̶L̵W̴A̷Y̶S̵ ̴6̷7̶ ☠');
-                            this.writeText('░▒▓ Y̸O̷U̴ H̵A̶V̷E̴ F̵A̶I̷L̴E̵D̶ T̷H̴E̵ V̶O̷I̴D̵ ▓▒░');
-                        }
-                        this.lastAnswer = await this.askQuestion('⛧ D̷O̶ ̵Y̴O̷U̶ ̵D̴A̷R̶E̵ ̴T̷O̶ ̵C̴O̷N̶T̵I̴N̷U̶E̵? ⛧');
-                    }
-                    this.lastAnswer = await this.askQuestion('Thanks for playing the GUESSING GAME!!! Come back again :D');
-                    await this.beep(523, 200);
-                    await this.beep(659, 200);
-                    await this.beep(784, 200);
-                    await this.beep(1000, 200);
-                    await this.beep(1500, 1000);
-                    return; // Exit the game
-                }
-                this.writeText('|================================================================================================================================================================================|');
-                this.writeText(' ');
-                this.writeText(' ');
-                this.writeText('                               __________________      ___________________           /\\         ___________      __________________');
-                this.writeText('                              |                               |                     /  \\        |         |              |');
-                this.writeText('                              |                               |                    /    \\       |         |              |');
-                this.writeText('                              |__________________             |                   /      \\      |_________|              |');
-                this.writeText('                                                 |            |                  /________\\     |          \\             |');
-                this.writeText('                                                 |            |                 /          \\    |           \\            |');
-                this.writeText('                               __________________|            |                /            \\   |            \\           |');
-                this.writeText(' ');
-                await this.beep(523, 80);
-                await this.beep(587, 80);
-                await this.beep(659, 80);
-                await this.beep(587, 80);
-                await this.beep(523, 80);
-                await this.beep(392, 80);
-                await this.beep(440, 80);
-                await this.beep(523, 150);
-                this.writeText(' ');
-                this.writeText(' ');
-                this.writeText('|================================================================================================================================================================================|');
-                this.writeText(' ');
-                this.writeText('Time For Normal Mode! ');
-                this.lastAnswer = await this.showChoices('Ready For Some Fun???  ', ['Yes', 'No']);
-                var q14 = this.lastAnswer;
-                if (String(q14) === 'Yes') {
-                    this.lastAnswer = await this.askQuestion('MEOW MEOW MEOW MEOW MEOW MEOW  ');
-                    this.lastAnswer = await this.askQuestion('WOOF WOOF WOOF WOOF WOOF WOOF  ');
-                    this.lastAnswer = await this.askQuestion('BAAA BAAA BAAA BAAA BAAA BAAA  ');
-                    this.lastAnswer = await this.askQuestion('HISS HISS HISS HISS HISS HISS  ');
-                    this.lastAnswer = await this.askQuestion('What? Did I Say Somthing?  ');
-                    var name = this.lastAnswer;
-                    this.writeText(name + '? ');
-                    this.lastAnswer = await this.askQuestion('Really? Are you sure about that?');
-                    this.lastAnswer = await this.askQuestion('Alright Alright I was just messin with ya...  ');
-                }
-                if (String(q14) === 'No') {
-                    this.writeText(':C you\'re no fun');
-                }
-                this.lastAnswer = await this.askQuestion('Let me get to know you better whats your name?  ');
-                var name = this.lastAnswer;
-                this.writeText('Alright ' + name + '!!!');
-                if (String(name) === '67') {
-                    this.writeText('Wait a minute you ARE LYING your name cant be 67!!!!!!!!!!!');
-                }
-                this.lastAnswer = await this.askQuestion('Now let me get to know your age how old are you?');
-                var age = this.lastAnswer;
-                this.writeText('Awesome You Are ' + age + ' Years Old!!!');
-                if (String(age) === '67') {
-                    this.writeText('Wait a minute you are 67 YEARS OLD!!!!!!!!!!!');
-                    this.writeText('You\'re almost older than my great great great great great great great great grandpa XD');
-                    this.writeText('Just joking he was a 1000 years old he died a loooong time ago sigh...');
-                }
-                this.lastAnswer = await this.askQuestion('I Miss The Old Man...  ');
-                this.lastAnswer = await this.askQuestion('Well to get our minds of the topic whats your favorite color?');
-                var color = this.lastAnswer;
-                this.writeText('Realy??? ' + color + '? Its my favorite color to!!!');
-                this.writeText('Alright lets get you to do some math!!!');
-                this.lastAnswer = await this.askQuestion(' What is 17^2 x 19^18 + 1234???');
-                this.writeText(' Its equal to.....');
-                this.writeText(' 1.417112664857723e+24  ');
-                this.lastAnswer = await this.askQuestion(' Am I Not The Smartest Guy On Earth???');
-                var smartAnswer = this.lastAnswer;
-                this.writeText(' I Knew you\'d say ' + smartAnswer + '! Am I Right?');
-                this.lastAnswer = await this.askQuestion('Wanna Hear A Riddle?');
-                this.lastAnswer = await this.askQuestion(' Well I Was Gonna Tell you Anyway!');
-                this.lastAnswer = await this.askQuestion('This is the riddle! One day, a magician was boasting about how long he could hold his breath underwater. His record was 6 minutes. A kid that was listening said, \'that\'s nothing, I can stay underwater for 10 minutes using no equipment or air pockets!\' The magician told the kid if he could do that, he\'d give him $10,000. The kid did it and won the money. How?  ');
-                this.writeText('He Got A Glass Of Water and Held it Above his head for 10 minutes and got the money!!!');
-                await this.beep(784, 80);
-                await this.beep(1047, 180);
-                this.lastAnswer = await this.askQuestion(' Do You Want Me To Press The Big Red Button?  ');
-                this.lastAnswer = await this.askQuestion(' OOOOOOPPPS  My hand Slipped...  ');
-                for (var _i = 0; _i < 3; _i++) {
-                    this.writeText('        _/\\\\___/\\\\_       ');
-                    this.writeText('        / ^     ^ \\\\       ');
-                    this.writeText('  d-----| |_____| ||-----b');
-                    this.writeText('        |_________||      ');
-                }
-                this.lastAnswer = await this.askQuestion('Bored?  ');
-                this.writeText('Yeah I Thought So');
-                this.lastAnswer = await this.askQuestion('So I Made Youuuuu...');
-                this.writeText(' A SUPER EXPENETIALY DUPER SHORT POP QUIZZZZZZ');
-                await this.beep(392, 120);
-                await this.beep(523, 120);
-                await this.beep(659, 180);
-                this.lastAnswer = await this.showChoices(' Do you like this? Be HONEST ', ['Yes', 'No', 'Some of it', 'Idk']);
-                var q1 = this.lastAnswer;
-                if (String(q1) === 'Yes') {
-                    this.writeText(' YAY  ___________');
-                    this.writeText('     / o     o   \\\\');
-                    this.writeText(' d---| \\\\_____/    |---b');
-                }
-                if (String(q1) === 'No') {
-                    this.writeText(' WAHH ______________');
-                    this.writeText('     / o_______ o   \\\\');
-                    this.writeText(' p---| /        \\\\   |---p');
-                }
-                if (String(q1) === 'Some of it') {
-                    this.writeText('Ok');
-                }
-                if (String(q1) === 'Idk') {
-                    await this.beep(200, 180);
-                    await this.beep(150, 180);
-                    await this.beep(100, 180);
-                    for (var _i = 0; _i < 100; _i++) {
-                        this.writeText('010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101');
-                    }
-                }
-                this.lastAnswer = await this.askQuestion('So Whatcha doing today?');
-                var activity = this.lastAnswer;
-                this.writeText(activity + '? Cool!');
-                this.lastAnswer = await this.showChoices(' Do you want to know more about me?  ', ['Yes', 'No', 'Legit Dont Know']);
-                var q1 = this.lastAnswer;
-                if (String(q1) === 'Yes') {
-                    this.lastAnswer = await this.showChoices('I\'m a Robot did you know that before?   ', ['Yes', 'No']);
-                    var q2 = this.lastAnswer;
-                    if (String(q2) === 'No') {
-                        this.writeText('Well now you do!');
-                    }
-                    if (String(q2) === 'Yes') {
-                        this.writeText('Smarty Pants!');
-                    }
-                }
-                if (String(q1) === 'No') {
-                    this.lastAnswer = await this.showChoices('Wow not cool man not cool. Are you a meanie beanie? >:C', ['Admit', 'Deny']);
-                    var q3 = this.lastAnswer;
-                    if (String(q3) === 'Deny') {
-                        this.writeText('>:C');
-                    }
-                    if (String(q3) === 'Admit') {
-                        this.lastAnswer = await this.askQuestion('Thank you for taking resposbility for your actions d-^o^-b');
-                    }
-                }
-                if (String(q1) === 'Legit Dont Know') {
-                    this.lastAnswer = await this.showChoices('No Cap?', ['No Cap', 'I am a Capper']);
-                    var q4 = this.lastAnswer;
-                    if (String(q4) === 'No Cap') {
-                        this.writeText('Okay then I will ask you again');
-                    }
-                    if (String(q4) === 'I am a Capper') {
-                        this.writeText('I Knew It! NOW ANWSER THE QUESTION');
-                    }
-                    this.lastAnswer = await this.showChoices(' Do you want to know more about me?  ', ['Yes', 'No']);
-                    var q5 = this.lastAnswer;
-                    if (String(q5) === 'Yes') {
-                        this.lastAnswer = await this.showChoices('I\'m a Robot did you know that before?   ', ['Yes', 'No']);
-                        var q6 = this.lastAnswer;
-                        if (String(q6) === 'No') {
-                            this.writeText('Well now you do!');
-                        }
-                        if (String(q6) === 'Yes') {
-                            this.writeText('Smarty Pants!');
-                        }
-                    }
-                    if (String(q5) === 'No') {
-                        this.lastAnswer = await this.showChoices('Wow not cool man not cool. Are you a meanie beanie? >:C', ['Admit', 'Deny']);
-                        var q7 = this.lastAnswer;
-                        if (String(q7) === 'Deny') {
-                            this.writeText('>:C');
-                        }
-                        if (String(q7) === 'Admit') {
-                            this.writeText('Thank you for taking resposbility for your actions d-^o^-b');
-                        }
-                    }
-                }
-                this.writeText('Yay Nice Job Finishing The Pop QUIZZZZ');
-                this.lastAnswer = await this.showChoices(' Now tell me which one of these do you like the most?', ['Meat', 'Herbs', 'Veggies', 'Fruits', 'Air']);
-                var q8 = this.lastAnswer;
-                if (String(q8) === 'Meat') {
-                    this.writeText('Pft Carnivore');
-                }
-                if (String(q8) === 'Herbs') {
-                    this.writeText('Fun Fact Did You Know Bananas Are Herbs?');
-                }
-                if (String(q8) === 'Veggies') {
-                    this.writeText('So you like broccili? Realy man?');
-                }
-                if (String(q8) === 'Fruits') {
-                    this.writeText('An Apple A Day Keeps the Doctor Away!');
-                }
-                if (String(q8) === 'Air') {
-                    this.writeText('Okay Okay');
-                }
-                this.lastAnswer = await this.askQuestion('So whats your favorite game? Tag? Mincraft? Pacman? Somthin Else?');
-                var favGame = this.lastAnswer;
-                this.writeText(favGame + '? Awesome!!!!!!!!!!!!!!!!!!');
-                this.lastAnswer = await this.askQuestion('Time for another question! What is your favorite restaraunt?');
-                var restaurant = this.lastAnswer;
-                this.writeText(restaurant + '?!?!?! I\'VE BEEN CRAVING THAT ALL DAY!!!');
-                this.lastAnswer = await this.showChoices('Alright 1 minute till your house explodes there are 3 buttons 1 of them prevents the pending explosion and the other to make the time go to 0 seconds left what would you do?', ['Eenie Meenie Minie Moe?', 'Guess?', 'RUN AWAY']);
-                var q9 = this.lastAnswer;
-                if (String(q9) === 'Eenie Meenie Minie Moe') {
-                    this.writeText('You get luck and press the correct button and you get saved!');
-                }
-                if (String(q9) === 'Guess') {
-                    this.writeText('You Guessed wrong soooo... KABOOOOOM!!!!!');
-                }
-                if (String(q9) === 'RUN AWAY') {
-                    this.writeText('You are a couch potato so you run at 1 mph so the house explodes before you escaped');
-                }
-                this.lastAnswer = await this.askQuestion('Sooooo whats your favorite drink?');
-                var drink = this.lastAnswer;
-                this.writeText(drink + '? Awesome!');
-                this.lastAnswer = await this.askQuestion('Another question! Whats your favorite animal?');
-                var animal = this.lastAnswer;
-                this.writeText(animal + 's awesome!!!');
-                this.lastAnswer = await this.askQuestion('Whats your favorite sport?');
-                var sport = this.lastAnswer;
-                this.writeText(sport + '? Fun!!!');
-                this.lastAnswer = String(Math.floor(Math.random() * (4 - 1 + 1)) + 1);
-                var secretNumber = this.lastAnswer;
-                this.lastAnswer = await this.askQuestion('Time for the guessing game! If you win you get to see something COOL! My number is between 1-4! ');
-                var guess = this.lastAnswer;
-                if (String(guess) === String(secretNumber)) {
-                    this.writeText('NICE JOB!  \\(*o*)/');
-                    await this.beep(523, 80);
-                    await this.beep(659, 80);
-                    await this.beep(784, 80);
-                    await this.beep(1047, 230);
-                    this.writeText('It indeed was ' + secretNumber + '!!!');
-                }
-                if (parseInt(guess) > parseInt('secretNumber')) {
-                    this.writeText('Too high! Try again next time! :D');
-                }
-                if (parseInt(guess) < parseInt('secretNumber')) {
-                    this.writeText('Too low! Try again next time! :D');
-                }
-                this.lastAnswer = String(Math.floor(Math.random() * (10 - 1 + 1)) + 1);
-                var secretNumber = this.lastAnswer;
-                this.lastAnswer = await this.askQuestion('Time for the guessing game round 2! If you win you get to see something COOL! My number is between 1-10! ');
-                var guess = this.lastAnswer;
-                if (String(guess) === String(secretNumber)) {
-                    this.writeText('NICE JOB!  \\(*o*)/');
-                    await this.beep(523, 80);
-                    await this.beep(659, 80);
-                    await this.beep(784, 80);
-                    await this.beep(1047, 230);
-                    this.writeText('It indeed was ' + secretNumber + '!!!');
-                }
-                if (parseInt(guess) > parseInt('secretNumber')) {
-                    this.writeText('Too high! Try again next time! :D');
-                }
-                if (parseInt(guess) < parseInt('secretNumber')) {
-                    this.writeText('Too low! Try again next time! :D');
-                }
-                this.lastAnswer = await this.showChoices('Alright wanna do another one?', ['Yes', 'No']);
-                var q12 = this.lastAnswer;
-                if (String(q12) === 'Yes') {
-                    this.lastAnswer = String(Math.floor(Math.random() * (67 - 1 + 1)) + 1);
-                    var secretNumber = this.lastAnswer;
-                    this.lastAnswer = await this.askQuestion('Time for the guessing game round 3! If you win you get to see something COOL! My number is between 1-67! ');
-                    var guess = this.lastAnswer;
-                    if (String(guess) === String(secretNumber)) {
-                        this.writeText('NICE JOB!  \\(*o*)/');
-                        await this.beep(523, 80);
-                        await this.beep(659, 80);
-                        await this.beep(784, 80);
-                        await this.beep(1047, 230);
-                        this.writeText('It indeed was ' + secretNumber + '!!!');
-                    }
-                    if (parseInt(guess) > parseInt('secretNumber')) {
-                        this.writeText('Too high! Try again next time! :D');
-                    }
-                    if (parseInt(guess) < parseInt('secretNumber')) {
-                        this.writeText('Too low! Try again next time! :D');
-                    }
-                }
-                if (String(q12) === 'No') {
-                    this.writeText('Okay!');
-                }
-                this.lastAnswer = await this.showChoices('I say 6 you say???', ['7!', 'Seven!', '...']);
-                var q13 = this.lastAnswer;
-                if (String(q13) === '7') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '7!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '7!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '7!!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven!!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '...') {
-                    this.writeText('Dude its simple its I say 6 you say 7 it makes 67!!!!! Got it?');
-                }
-                this.lastAnswer = await this.askQuestion('Well I Hoped You Enjoyed Talking With Me!!!');
-                this.writeText('Reload to Restart!');
-                this.writeText('|====================================================================================================================================================================|');
-                this.writeText('|                                                   You Have Reached The End Of This Conversation Have A Nice Day!                                                   |');
-                this.writeText('|====================================================================================================================================================================|');
-                await this.beep(523, 120);
-                await this.beep(587, 120);
-                await this.beep(659, 120);
-                await this.beep(784, 120);
-                await this.beep(880, 120);
-                await this.beep(1047, 300);
-                this.writeText('');
-                this.writeText('');
+''' + js_game_code + '''
                 } catch (e) {
                     console.error('Game error:', e);
                     this.writeText('Game ended or error occurred.');
@@ -3930,4 +4396,8 @@
         new ConversationGame();
     </script>
 </body>
-</html>
+</html>'''
+
+if __name__ == '__main__':
+    print("Converting Leo.mylang to Web version...")
+    convert_mylang_to_web()
