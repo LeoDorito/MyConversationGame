@@ -1,1179 +1,283 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>The Conversation Game! :D</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700&display=swap');
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a1a 100%);
-            min-height: 100vh;
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-            display: flex; flex-direction: column; align-items: center; padding: 20px;
-        }
-        .title {
-            font-family: 'Orbitron', sans-serif; font-size: 2.5em; color: #00ff88;
-            text-shadow: 0 0 20px #00ff88, 0 0 40px #00ff88;
-            margin-bottom: 20px; text-align: center;
-            animation: glow 2s ease-in-out infinite alternate;
-        }
-        @keyframes glow {
-            from { text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88; }
-            to { text-shadow: 0 0 30px #00ff88, 0 0 60px #00ff88, 0 0 80px #00ff88; }
-        }
-        .game-container {
-            width: 98%; max-width: 1400px;
-            background: rgba(22, 33, 62, 0.95);
-            border: 2px solid #00ff88; border-radius: 15px;
-            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3); overflow: hidden;
-        }
-        #text-area {
-            height: 550px; overflow-y: auto; overflow-x: auto; padding: 20px;
-            background: rgba(10, 15, 30, 0.9); border-bottom: 2px solid #00ff88;
-        }
-        .message {
-            color: #00ff88; font-size: 13px; line-height: 1.6; margin-bottom: 8px;
-            animation: fadeIn 0.3s ease-out; white-space: pre;
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .message.user { color: #00ffff; font-style: italic; }
-        .input-section {
-            padding: 20px; display: flex; gap: 10px; flex-wrap: wrap;
-            justify-content: center; align-items: center;
-        }
-        #user-input {
-            flex: 1; min-width: 200px; padding: 15px 20px; font-size: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            background: rgba(15, 52, 96, 0.8); border: 2px solid #00ff88;
-            border-radius: 10px; color: #00ff88; outline: none;
-        }
-        #user-input:focus { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); border-color: #00ffff; }
-        #user-input::placeholder { color: rgba(0, 255, 136, 0.5); }
-        .btn {
-            padding: 15px 30px; font-size: 16px; font-family: 'Orbitron', sans-serif;
-            font-weight: bold; border: none; border-radius: 10px; cursor: pointer;
-        }
-        .btn-submit { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a1a; }
-        .btn-submit:hover { transform: scale(1.05); box-shadow: 0 0 25px rgba(0, 255, 136, 0.5); }
-        #choices { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; width: 100%; }
-        .btn-choice {
-            padding: 12px 25px; font-size: 14px; font-family: 'Orbitron', sans-serif;
-            font-weight: bold; border: 2px solid #00ff88; border-radius: 10px;
-            cursor: pointer; color: #00ff88; background: rgba(15, 52, 96, 0.8);
-        }
-        .btn-choice:hover { transform: scale(1.08); background: #00ff88; color: #0a0a1a; }
-        .hidden { display: none !important; }
-        #text-area::-webkit-scrollbar { width: 10px; height: 10px; }
-        #text-area::-webkit-scrollbar-track { background: rgba(10, 15, 30, 0.5); }
-        #text-area::-webkit-scrollbar-thumb { background: #00ff88; border-radius: 5px; }
-    </style>
-</head>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stuff Lingo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+:root{--bg:#fff7e0;--card:#fff;--text:#2b2b3a;--muted:#6a6a7a;--line:#2b2b3a;--green:#58cc02;--gd:#2f7a00;--red:#ff4b4b;--rd:#a02020;--blue:#1cb0f6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1530;--card:#2a2250;--text:#f4efff;--muted:#a9a0c8;--line:#0b0818}}
+*{box-sizing:border-box;cursor:inherit;border-radius:0 !important}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:"Press Start 2P","Courier New",monospace;font-size:12px;line-height:1.7;cursor:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAo0lEQVR4nO3Y0QqDMAwF0Hbs/385exgoswpzkLas57wJkgZzqdVSAAAAAAAAAPh/NbF2DFjztsfoBkbLmMbH5CPel7U2S02RBAlIrB2l7AnYFmyT0KOXSxKQUPN09z8mYWtg8N6wfALSHkBEXE79l/uyLJ+AZ/YCI6f7DQnIKnzc3WdNwvIJ6PHOPf02aBrZE+Mc0NOI8/dU/wmWTwAAAACwnhc/gSQUxvmKRQAAAABJRU5ErkJggg==) 24 30,auto}
+body.down{cursor:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAnElEQVR4nO3XQQ7CMAwEwATx/y+bGyKohRxwXJGZc+RW8cp1WwMAAAAAAAAA/l1PrB2Fz552q36BaveEmkPnI8Yg9H6Jxj9JwA9rfez8t/OtaCZsn4CMWz9s/VkiDmbC0iRsn4C0C4iImTkwfS7L9gnI2AMGld2dIQFZhd+n+1WTsH0CVnxzpzbEl8TYA1aq2L/PhoF/AQAAAFjjAbjeJRV+cxUpAAAAAElFTkSuQmCC) 24 30,auto}
+img{image-rendering:pixelated;image-rendering:crisp-edges}
+main{max-width:560px;margin:0 auto;padding:24px 20px 40px;text-align:center}
+.screen{display:none}.screen.on{display:block}
+#logo{width:min(70vw,288px);height:auto;margin-top:20px}
+h1{margin:14px 0 10px;font-size:1.6rem;color:var(--green);text-shadow:4px 4px 0 var(--line);line-height:1.3}
+p.sub{color:var(--muted);margin:0 0 28px;font-size:.75rem}
+#play{background:none;border:0;padding:0;display:inline-block}
+#play img{width:min(60vw,256px);height:auto;transition:transform .1s steps(2)}
+#play:hover img{transform:scale(1.0625)}
+#play:active img{transform:scale(.9375)}
+.hint{color:var(--muted);margin-top:14px;font-size:.65rem}
+.top{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.bar{flex:1;height:24px;border:4px solid var(--line);background:var(--card);padding:2px}
+#fill{height:100%;width:0;background:repeating-linear-gradient(90deg,var(--green) 0 12px,var(--gd) 12px 16px);transition:width .3s steps(6)}
+#hearts{display:flex;gap:4px}
+.hrt{width:24px;height:20px;image-rendering:pixelated}
+h2{font-size:.95rem;margin:10px 0 24px;text-align:left;line-height:1.6}
+.opt{display:block;width:100%;text-align:left;margin-bottom:14px;padding:14px 16px;font:inherit;font-size:.75rem;line-height:1.6;color:var(--text);background:var(--card);border:4px solid var(--line);box-shadow:0 6px 0 var(--line)}
+.opt:hover{background:#bfe9ff;color:#2b2b3a;border-color:var(--blue);box-shadow:0 6px 0 var(--blue)}
+.opt:active{transform:translateY(4px);box-shadow:0 2px 0 var(--line)}
+.opt.ok{background:#c9f29a;color:#2b2b3a;border-color:var(--gd);box-shadow:0 6px 0 var(--gd)}
+.opt.no{background:#ffc4c4;color:#2b2b3a;border-color:var(--rd);box-shadow:0 6px 0 var(--rd)}
+.opt:disabled{pointer-events:none}
+#fb{white-space:pre-line;min-height:80px;margin-top:18px;font-size:.7rem;text-align:left;line-height:1.8}
+.big{display:inline-block;margin-top:10px;padding:16px 28px;border:4px solid var(--line);background:var(--green);box-shadow:0 6px 0 var(--gd),0 6px 0 4px var(--line);color:#fff;text-shadow:2px 2px 0 var(--gd);font:inherit;font-size:.8rem;text-transform:uppercase}
+.big:active{transform:translateY(5px);box-shadow:0 1px 0 var(--gd),0 1px 0 4px var(--line)}
+#xp{font-size:2rem;color:#ffb100;text-shadow:4px 4px 0 var(--line);margin:18px 0}
+.sm{width:128px;height:128px}
+.pathtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;font-size:.7rem}
+.sbtn{font:inherit;font-size:.65rem;padding:10px 12px;background:var(--card);color:var(--text);border:4px solid var(--line);box-shadow:0 4px 0 var(--line)}
+.sbtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--line)}
+.banner{background:var(--green);color:#fff;border:4px solid var(--line);box-shadow:0 6px 0 var(--gd),0 6px 0 4px var(--line);padding:14px;text-align:left;margin-bottom:22px;font-size:.65rem;text-shadow:2px 2px 0 var(--gd)}
+.banner b{display:block;font-size:.95rem;margin-top:6px}
+.step{display:flex;flex-direction:column;align-items:center;margin-bottom:30px}
+.node{position:relative;width:96px;height:96px;padding:0;background:none;border:0}
+.node .sp{width:96px;height:96px;display:block}
+.node .ic{position:absolute;left:50%;top:50%;width:35px;height:35px;transform:translate(-50%,-50%)}
+.node.lock .sp{filter:grayscale(1) brightness(.75)}
+.nm{font-size:.6rem;margin-top:8px;color:var(--muted)}
+.go{font-size:.65rem;background:var(--card);border:4px solid var(--line);padding:6px 10px;margin-bottom:10px;animation:bob .8s steps(2) infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+#msg{min-height:20px;font-size:.6rem;line-height:1.6;margin-bottom:16px}
+.top .sbtn{padding:8px 10px}
+.pic{width:160px;height:160px;image-rendering:pixelated;background:var(--card);border:4px solid var(--line);box-shadow:0 6px 0 var(--line);display:block;margin:0 auto 22px}
+.banner{margin:30px 0 26px}
+.banner span{display:block;margin-top:8px;font-size:.55rem;line-height:1.5}
+#q{white-space:pre-line}
+.tl{font-size:.6rem;color:var(--blue);margin:-12px 0 18px;text-align:left}
+.tbox{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 60px);max-width:536px;margin:0 auto;z-index:20;background:var(--card);border:4px solid var(--line);box-shadow:0 6px 0 var(--line);padding:16px;text-align:left;font-size:.65rem;line-height:1.8}
+.tbox .big{margin:0 10px 0 0;padding:12px 16px;font-size:.65rem}
+</style></head>
 <body>
-    <h1 class="title">🎮 THE CONVERSATION GAME 🎮</h1>
-    <div class="game-container">
-        <div id="text-area"></div>
-        <div class="input-section">
-            <input type="text" id="user-input" placeholder="Type your answer here..." autocomplete="off">
-            <button class="btn btn-submit" id="submit-btn">Submit ✓</button>
-            <div id="choices"></div>
-        </div>
-    </div>
-    <script>
-        // TRANSLATION SYSTEM - All game text in 4 languages
-        const translations = {
-            // === WELCOME & INSTRUCTIONS ===
-            "WELCOME TO THE CONVERSATION GAME!": {
-                "Spanish": "¡BIENVENIDO AL JUEGO DE CONVERSACIÓN!",
-                "French": "BIENVENUE AU JEU DE CONVERSATION!",
-                "Turkish": "SOHBET OYUNUNA HOŞGELDİNİZ!"
-            },
-            "READ THIS IS IMPORTANT   Reply To Stuff I Say And When Answering multi choice you need to write EXACTLY the option you're choosing! Same uppercases no extra punctuation or else": {
-                "Spanish": "LEE ESTO ES IMPORTANTE   Responde a lo que digo. ¡Cuando respondas a opciones múltiples, escribe EXACTAMENTE la opción que elijas! Mismas mayúsculas, sin puntuación extra",
-                "French": "LISEZ C'EST IMPORTANT   Répondez à ce que je dis. Pour les choix multiples, écrivez EXACTEMENT l'option choisie! Mêmes majuscules, pas de ponctuation en plus",
-                "Turkish": "BUNU OKU ÖNEMLİ   Söylediklerime cevap ver. Çoktan seçmeli sorularda SEÇTİĞİN seçeneği TAM OLARAK yaz! Aynı büyük harfler, ekstra noktalama işareti yok"
-            },
-            "It wont work! Press Enter To Skip Lines Don't do that on the guessing games though!      Enlarge For Better Experience!": {
-                "Spanish": "¡No funcionará! Presiona Enter para saltar líneas. ¡No hagas eso en los juegos de adivinanzas! ¡Amplía para mejor experiencia!",
-                "French": "Ça ne marchera pas! Appuyez sur Entrée pour sauter des lignes. Ne faites pas ça dans les jeux de devinettes! Agrandissez pour une meilleure expérience!",
-                "Turkish": "Çalışmayacak! Satırları atlamak için Enter'a bas. Tahmin oyunlarında bunu yapma! Daha iyi deneyim için büyüt!"
-            },
-            "Welcome To The Game, Want A Tutorial? Type": {
-                "Spanish": "Bienvenido al juego, ¿Quieres un tutorial?",
-                "French": "Bienvenue au jeu, voulez-vous un tutoriel?",
-                "Turkish": "Oyuna hoş geldin, bir öğretici ister misin?"
-            },
-            // === TUTORIAL ===
-            "This is a question you can type to reply or press enter to skip!": {
-                "Spanish": "¡Esta es una pregunta que puedes responder escribiendo o presionar enter para saltar!",
-                "French": "C'est une question à laquelle vous pouvez répondre en tapant ou appuyer sur entrée pour passer!",
-                "Turkish": "Bu cevap yazabileceğin veya atlamak için enter'a basabileceğin bir soru!"
-            },
-            "But there are some stuff you cant answer such as this!": {
-                "Spanish": "¡Pero hay algunas cosas que no puedes responder como esto!",
-                "French": "Mais il y a des choses auxquelles vous ne pouvez pas répondre comme ceci!",
-                "Turkish": "Ama bunun gibi cevaplayamayacağın bazı şeyler var!"
-            },
-            "There are also guessing games where I think of a number and you try to guess it! I am thinking of a number 1-2, remember if you type anything other than a number, it will break this conversation so you have to restart by closing and reopening the app! Guess!  ": {
-                "Spanish": "¡También hay juegos de adivinanzas donde pienso en un número y tú intentas adivinarlo! Estoy pensando en un número 1-2, recuerda que si escribes algo que no sea un número, se romperá la conversación. ¡Adivina!",
-                "French": "Il y a aussi des jeux de devinettes où je pense à un nombre et vous essayez de le deviner! Je pense à un nombre 1-2, n'oubliez pas que si vous tapez autre chose qu'un nombre, la conversation sera interrompue. Devinez!",
-                "Turkish": "Ayrıca benim bir sayı düşündüğüm ve senin tahmin etmeye çalıştığın tahmin oyunları var! 1-2 arasında bir sayı düşünüyorum, sayı dışında bir şey yazarsan konuşma bozulur. Tahmin et!"
-            },
-            "NICE JOB!  \\(*o*)/": {
-                "Spanish": "¡BUEN TRABAJO! \\(*o*)/",
-                "French": "BON TRAVAIL! \\(*o*)/",
-                "Turkish": "GÜZEL İŞ! \\(*o*)/"
-            },
-            "Too high! Try again next time! :D": {
-                "Spanish": "¡Muy alto! ¡Inténtalo de nuevo la próxima vez! :D",
-                "French": "Trop haut! Réessayez la prochaine fois! :D",
-                "Turkish": "Çok yüksek! Bir dahaki sefere tekrar dene! :D"
-            },
-            "Too low! Try again next time! :D": {
-                "Spanish": "¡Muy bajo! ¡Inténtalo de nuevo la próxima vez! :D",
-                "French": "Trop bas! Réessayez la prochaine fois! :D",
-                "Turkish": "Çok düşük! Bir dahaki sefere tekrar dene! :D"
-            },
-            "There are some multi-choice questions such as this! The option you choose changes the response! Choose one now!Make sure all uppercases are the same and no extra punctuation is added while you write you choice!": {
-                "Spanish": "¡Hay algunas preguntas de opción múltiple como esta! ¡La opción que elijas cambia la respuesta! ¡Elige una ahora!",
-                "French": "Il y a des questions à choix multiples comme celle-ci! L'option que vous choisissez change la réponse! Choisissez-en une maintenant!",
-                "Turkish": "Bunun gibi çoktan seçmeli sorular var! Seçtiğin seçenek cevabı değiştirir! Şimdi birini seç!"
-            },
-            "Taco GANG!!!": {
-                "Spanish": "¡¡¡PANDILLA TACO!!!",
-                "French": "GANG TACO!!!",
-                "Turkish": "TAKO ÇETESI!!!"
-            },
-            "Burrito RULES!!!": {
-                "Spanish": "¡¡¡BURRITO MANDA!!!",
-                "French": "BURRITO RÈGNE!!!",
-                "Turkish": "BURRİTO KURAL KOYAR!!!"
-            },
-            "Oh and there are also sounds time to time reply to this to listen! :D": {
-                "Spanish": "¡Oh, y también hay sonidos de vez en cuando, responde a esto para escuchar! :D",
-                "French": "Oh et il y a aussi des sons de temps en temps, répondez pour écouter! :D",
-                "Turkish": "Oh ve zaman zaman sesler de var, dinlemek için buna cevap ver! :D"
-            },
-            "Alright that's all! Reply to finish!": {
-                "Spanish": "¡Bien, eso es todo! ¡Responde para terminar!",
-                "French": "D'accord c'est tout! Répondez pour finir!",
-                "Turkish": "Tamam hepsi bu! Bitirmek için cevap ver!"
-            },
-            "Okay your loss! ": {
-                "Spanish": "¡Okay, te lo pierdes!",
-                "French": "D'accord, c'est votre perte!",
-                "Turkish": "Tamam, senin kaybın!"
-            },
-            // === FUN SECTION ===
-            "Ready For Some Fun???  ": {
-                "Spanish": "¿Listo para divertirte?",
-                "French": "Prêt pour du fun?",
-                "Turkish": "Eğlenceye hazır mısın?"
-            },
-            "MEOW MEOW MEOW MEOW MEOW MEOW  ": {
-                "Spanish": "MIAU MIAU MIAU MIAU MIAU MIAU",
-                "French": "MIAOU MIAOU MIAOU MIAOU MIAOU MIAOU",
-                "Turkish": "MİYAV MİYAV MİYAV MİYAV MİYAV MİYAV"
-            },
-            "WOOF WOOF WOOF WOOF WOOF WOOF  ": {
-                "Spanish": "GUAU GUAU GUAU GUAU GUAU GUAU",
-                "French": "OUAF OUAF OUAF OUAF OUAF OUAF",
-                "Turkish": "HAV HAV HAV HAV HAV HAV"
-            },
-            "BAAA BAAA BAAA BAAA BAAA BAAA  ": {
-                "Spanish": "BEEE BEEE BEEE BEEE BEEE BEEE",
-                "French": "BÊÊÊ BÊÊÊ BÊÊÊ BÊÊÊ BÊÊÊ BÊÊÊ",
-                "Turkish": "MEE MEE MEE MEE MEE MEE"
-            },
-            "HISS HISS HISS HISS HISS HISS  ": {
-                "Spanish": "SSSSS SSSSS SSSSS SSSSS SSSSS SSSSS",
-                "French": "SSSSS SSSSS SSSSS SSSSS SSSSS SSSSS",
-                "Turkish": "HISSS HISSS HISSS HISSS HISSS HISSS"
-            },
-            "What? Did I Say Somthing?  ": {
-                "Spanish": "¿Qué? ¿Dije algo?",
-                "French": "Quoi? J'ai dit quelque chose?",
-                "Turkish": "Ne? Bir şey mi dedim?"
-            },
-            "Really? Are you sure about that 😏": {
-                "Spanish": "¿En serio? ¿Estás seguro de eso? 😏",
-                "French": "Vraiment? Vous êtes sûr de ça? 😏",
-                "Turkish": "Gerçekten mi? Bundan emin misin? 😏"
-            },
-            "Alright Alright I was just messin with ya...  ": {
-                "Spanish": "Está bien, está bien, solo bromeaba contigo...",
-                "French": "D'accord d'accord je plaisantais...",
-                "Turkish": "Tamam tamam seninle dalga geçiyordum..."
-            },
-            ":C you're no fun": {
-                "Spanish": ":C no eres divertido",
-                "French": ":C tu n'es pas drôle",
-                "Turkish": ":C hiç eğlenceli değilsin"
-            },
-            // === GET TO KNOW YOU ===
-            "Let me get to know you better whats your name?  ": {
-                "Spanish": "Déjame conocerte mejor, ¿cuál es tu nombre?",
-                "French": "Laissez-moi mieux vous connaître, quel est votre nom?",
-                "Turkish": "Seni daha iyi tanımama izin ver, adın ne?"
-            },
-            "Now let me get to know your age how old are you?": {
-                "Spanish": "Ahora déjame saber tu edad, ¿cuántos años tienes?",
-                "French": "Maintenant laissez-moi connaître votre âge, quel âge avez-vous?",
-                "Turkish": "Şimdi yaşını öğreneyim, kaç yaşındasın?"
-            },
-            "You're almost older than my great great great great great great great great grandpa XD": {
-                "Spanish": "¡Casi eres más viejo que mi tataratataratatarabuelo XD!",
-                "French": "Tu es presque plus vieux que mon arrière-arrière-arrière-arrière-grand-père XD!",
-                "Turkish": "Neredeyse dedemin dedesinin dedesinden daha yaşlısın XD!"
-            },
-            "Just joking he was a 1000 years old he died a loooong time ago sigh...": {
-                "Spanish": "Es broma, tenía 1000 años, murió hace muuucho tiempo, suspiro...",
-                "French": "Je plaisante, il avait 1000 ans, il est mort il y a très longtemps, soupir...",
-                "Turkish": "Şaka yapıyorum 1000 yaşındaydı çok uzun zaman önce öldü of..."
-            },
-            "I Miss The Old Man 😢  ": {
-                "Spanish": "Extraño al viejo 😢",
-                "French": "Le vieil homme me manque 😢",
-                "Turkish": "Yaşlı adamı özlüyorum 😢"
-            },
-            "Well to get our minds of the topic whats your favorite color?": {
-                "Spanish": "Bueno, para cambiar de tema, ¿cuál es tu color favorito?",
-                "French": "Bon, pour changer de sujet, quelle est votre couleur préférée?",
-                "Turkish": "Konuyu değiştirmek için, en sevdiğin renk ne?"
-            },
-            "Alright lets get you to do some math!!!": {
-                "Spanish": "¡Bien, vamos a hacer algo de matemáticas!",
-                "French": "D'accord, faisons un peu de maths!",
-                "Turkish": "Tamam biraz matematik yapalım!"
-            },
-            " What is 17^2 x 19^18 + 1234???": {
-                "Spanish": "¿Cuánto es 17^2 x 19^18 + 1234???",
-                "French": "Combien fait 17^2 x 19^18 + 1234???",
-                "Turkish": "17^2 x 19^18 + 1234 kaç eder???"
-            },
-            " Its equal to.....": {
-                "Spanish": "Es igual a.....",
-                "French": "C'est égal à.....",
-                "Turkish": "Eşittir....."
-            },
-            " 1.417112664857723e+24 🤓  ": {
-                "Spanish": "1.417112664857723e+24 🤓",
-                "French": "1.417112664857723e+24 🤓",
-                "Turkish": "1.417112664857723e+24 🤓"
-            },
-            " Am I Not The Smartest Guy On Earth???": {
-                "Spanish": "¿No soy el más inteligente del mundo???",
-                "French": "Ne suis-je pas le plus intelligent au monde???",
-                "Turkish": "Dünyanın en zeki insanı değil miyim???"
-            },
-            "Wanna Hear A Riddle?": {
-                "Spanish": "¿Quieres escuchar un acertijo?",
-                "French": "Voulez-vous entendre une devinette?",
-                "Turkish": "Bir bilmece duymak ister misin?"
-            },
-            " Well I Was Gonna Tell you Anyway!": {
-                "Spanish": "¡Bueno, te lo iba a decir de todos modos!",
-                "French": "Eh bien, j'allais vous le dire de toute façon!",
-                "Turkish": "Neyse zaten söyleyecektim!"
-            },
-            "This is the riddle! One day, a magician was boasting about how long he could hold his breath underwater. His record was 6 minutes. A kid that was listening said, 'that's nothing, I can stay underwater for 10 minutes using no equipment or air pockets!' The magician told the kid if he could do that, he'd give him $10,000. The kid did it and won the money. How?  ": {
-                "Spanish": "¡Este es el acertijo! Un día, un mago presumía de cuánto tiempo podía aguantar la respiración bajo el agua. Su récord era de 6 minutos. Un niño que escuchaba dijo: 'eso no es nada, ¡puedo estar bajo el agua 10 minutos sin equipo ni bolsas de aire!' El mago le dijo que si podía hacerlo, le daría $10,000. El niño lo hizo y ganó el dinero. ¿Cómo?",
-                "French": "Voici la devinette! Un jour, un magicien se vantait de combien de temps il pouvait retenir son souffle sous l'eau. Son record était de 6 minutes. Un enfant qui écoutait a dit: 'ce n'est rien, je peux rester sous l'eau 10 minutes sans équipement!' Le magicien a dit à l'enfant que s'il pouvait le faire, il lui donnerait 10 000$. L'enfant l'a fait et a gagné l'argent. Comment?",
-                "Turkish": "İşte bilmece! Bir gün bir sihirbaz suyun altında ne kadar süre nefesini tutabildiğiyle övünüyordu. Rekoru 6 dakikaydı. Dinleyen bir çocuk dedi ki: 'bu hiçbir şey, ekipman olmadan 10 dakika suyun altında kalabilirim!' Sihirbaz çocuğa bunu yapabilirse 10.000$ vereceğini söyledi. Çocuk yaptı ve parayı kazandı. Nasıl?"
-            },
-            "He Got A Glass Of Water and Held it Above his head for 10 minutes and got the money!!!": {
-                "Spanish": "¡Cogió un vaso de agua y lo sostuvo sobre su cabeza durante 10 minutos y consiguió el dinero!",
-                "French": "Il a pris un verre d'eau et l'a tenu au-dessus de sa tête pendant 10 minutes et a gagné l'argent!",
-                "Turkish": "Bir bardak su aldı ve 10 dakika başının üstünde tuttu ve parayı aldı!"
-            },
-            " Do You Want Me To Press The Big Red Button?  ": {
-                "Spanish": "¿Quieres que presione el gran botón rojo?",
-                "French": "Voulez-vous que j'appuie sur le gros bouton rouge?",
-                "Turkish": "Büyük kırmızı düğmeye basmamı ister misin?"
-            },
-            " OOOOOOPPPS  My hand Slipped 👉🔴  ": {
-                "Spanish": "UUUUPPPS Se me resbaló la mano 👉🔴",
-                "French": "OOOOOOPS Ma main a glissé 👉🔴",
-                "Turkish": "OOOOPPPS Elim kaydı 👉🔴"
-            },
-            "Bored?  ": {
-                "Spanish": "¿Aburrido?",
-                "French": "Ennuyé?",
-                "Turkish": "Sıkıldın mı?"
-            },
-            "Yeah I Thought So": {
-                "Spanish": "Sí, lo sabía",
-                "French": "Ouais, je m'en doutais",
-                "Turkish": "Evet öyle düşünmüştüm"
-            },
-            "So I Made Youuuuu...": {
-                "Spanish": "Así que te hice...",
-                "French": "Alors je t'ai fait...",
-                "Turkish": "Bu yüzden sana yaptım..."
-            },
-            " A SUPER EXPENETIALY DUPER SHORT POP QUIZZZZZZ": {
-                "Spanish": "¡UN SÚPER MEGA CORTO CUESTIONARIO SORPRESA!",
-                "French": "UN SUPER MÉGA COURT QUIZ SURPRISE!",
-                "Turkish": "SÜPER MEGA KISA BİR POP QUIZ!!!"
-            },
-            // === POP QUIZ ===
-            " Do you like this? Be HONEST ": {
-                "Spanish": "¿Te gusta esto? Sé HONESTO",
-                "French": "Aimez-vous ceci? Soyez HONNÊTE",
-                "Turkish": "Bunu beğeniyor musun? DÜRÜST ol"
-            },
-            " YAY  ___________": {
-                "Spanish": "¡YUPI! ___________",
-                "French": "YOUPI! ___________",
-                "Turkish": "YAŞA! ___________"
-            },
-            " WAHH ______________": {
-                "Spanish": "BUAAA ______________",
-                "French": "OUAH ______________",
-                "Turkish": "AĞLA ______________"
-            },
-            "Ok": {
-                "Spanish": "Ok",
-                "French": "Ok",
-                "Turkish": "Tamam"
-            },
-            "So Whatcha doing today?": {
-                "Spanish": "¿Qué haces hoy?",
-                "French": "Qu'est-ce que tu fais aujourd'hui?",
-                "Turkish": "Bugün ne yapıyorsun?"
-            },
-            " Do you want to know more about me?  ": {
-                "Spanish": "¿Quieres saber más sobre mí?",
-                "French": "Voulez-vous en savoir plus sur moi?",
-                "Turkish": "Hakkımda daha fazla bilmek ister misin?"
-            },
-            "I'm a Robot did you know that before?   ": {
-                "Spanish": "Soy un robot, ¿lo sabías antes?",
-                "French": "Je suis un robot, le saviez-vous avant?",
-                "Turkish": "Ben bir robotum, bunu daha önce biliyor muydun?"
-            },
-            "Well now you do!": {
-                "Spanish": "¡Bueno, ahora lo sabes!",
-                "French": "Eh bien maintenant tu le sais!",
-                "Turkish": "Şimdi biliyorsun!"
-            },
-            "Smarty Pants!": {
-                "Spanish": "¡Sabelotodo!",
-                "French": "Petit malin!",
-                "Turkish": "Ukala!"
-            },
-            "Wow not cool man not cool. Are you a meanie beanie? >:C": {
-                "Spanish": "Wow, no está bien. ¿Eres un malvado? >:C",
-                "French": "Wow pas cool. Es-tu méchant? >:C",
-                "Turkish": "Vay hiç hoş değil. Kötü biri misin? >:C"
-            },
-            ">:C": {
-                "Spanish": ">:C",
-                "French": ">:C",
-                "Turkish": ">:C"
-            },
-            "Thank you for taking resposbility for your actions d-^o^-b": {
-                "Spanish": "Gracias por asumir la responsabilidad de tus acciones d-^o^-b",
-                "French": "Merci d'assumer la responsabilité de tes actions d-^o^-b",
-                "Turkish": "Eylemlerinin sorumluluğunu aldığın için teşekkürler d-^o^-b"
-            },
-            "No Cap?": {
-                "Spanish": "¿Sin mentir?",
-                "French": "Sans mentir?",
-                "Turkish": "Cidden mi?"
-            },
-            "Okay then I will ask you again": {
-                "Spanish": "Bueno, entonces te preguntaré de nuevo",
-                "French": "D'accord alors je te redemande",
-                "Turkish": "Tamam o zaman sana tekrar soracağım"
-            },
-            "I Knew It! NOW ANWSER THE QUESTION": {
-                "Spanish": "¡Lo sabía! AHORA RESPONDE LA PREGUNTA",
-                "French": "Je le savais! MAINTENANT RÉPONDS À LA QUESTION",
-                "Turkish": "Biliyordum! ŞİMDİ SORUYA CEVAP VER"
-            },
-            "Yay Nice Job Finishing The Pop QUIZZZZ": {
-                "Spanish": "¡Genial, buen trabajo terminando el cuestionario!",
-                "French": "Super, bon travail pour avoir fini le quiz!",
-                "Turkish": "Yaşa, pop quiz'i bitirdiğin için aferin!"
-            },
-            // === FOOD QUESTIONS ===
-            " Now tell me which one of these do you like the most?": {
-                "Spanish": "¿Ahora dime cuál de estos te gusta más?",
-                "French": "Maintenant dis-moi lequel tu préfères?",
-                "Turkish": "Şimdi bunlardan hangisini en çok sevdiğini söyle?"
-            },
-            "Pft Carnivore": {
-                "Spanish": "Pft Carnívoro",
-                "French": "Pft Carnivore",
-                "Turkish": "Pft Etobur"
-            },
-            "Fun Fact Did You Know Bananas Are Herbs?": {
-                "Spanish": "Dato curioso: ¿Sabías que los plátanos son hierbas?",
-                "French": "Fait amusant: Saviez-vous que les bananes sont des herbes?",
-                "Turkish": "İlginç bilgi: Muzların otsu bitki olduğunu biliyor muydun?"
-            },
-            "So you like broccili? Realy man?": {
-                "Spanish": "¿Así que te gusta el brócoli? ¿En serio?",
-                "French": "Alors tu aimes le brocoli? Vraiment?",
-                "Turkish": "Yani brokoli mi seviyorsun? Cidden mi?"
-            },
-            "An Apple A Day Keeps the Doctor Away!": {
-                "Spanish": "¡Una manzana al día mantiene al doctor alejado!",
-                "French": "Une pomme par jour éloigne le médecin!",
-                "Turkish": "Günde bir elma doktoru uzak tutar!"
-            },
-            "Okay Okay": {
-                "Spanish": "Bueno bueno",
-                "French": "D'accord d'accord",
-                "Turkish": "Tamam tamam"
-            },
-            // === FAVORITE THINGS ===
-            "So whats your favorite game? Tag? Mincraft? Pacman? Somthin Else?": {
-                "Spanish": "¿Cuál es tu juego favorito? ¿Pillarse? ¿Minecraft? ¿Pacman? ¿Algo más?",
-                "French": "Quel est ton jeu préféré? Chat? Minecraft? Pacman? Autre chose?",
-                "Turkish": "En sevdiğin oyun ne? Yakalamaca? Minecraft? Pacman? Başka bir şey?"
-            },
-            "Time for another question! What is your favorite restaraunt?": {
-                "Spanish": "¡Hora de otra pregunta! ¿Cuál es tu restaurante favorito?",
-                "French": "Une autre question! Quel est ton restaurant préféré?",
-                "Turkish": "Başka bir soru zamanı! En sevdiğin restoran hangisi?"
-            },
-            "Alright 1 minute till your house explodes there are 3 buttons 1 of them prevents the pending explosion and the other to make the time go to 0 seconds left what would you do?": {
-                "Spanish": "Bien, 1 minuto hasta que tu casa explote, hay 3 botones, uno previene la explosión y otro hace que el tiempo llegue a 0. ¿Qué harías?",
-                "French": "D'accord, 1 minute avant que ta maison n'explose, il y a 3 boutons, un empêche l'explosion et un autre met le temps à 0. Que ferais-tu?",
-                "Turkish": "Tamam, evin patlayana kadar 1 dakika var, 3 düğme var, biri patlamayı önler diğeri zamanı 0'a getirir. Ne yaparsın?"
-            },
-            "You get luck and press the correct button and you get saved!": {
-                "Spanish": "¡Tienes suerte y presionas el botón correcto y te salvas!",
-                "French": "Tu as de la chance et tu appuies sur le bon bouton et tu es sauvé!",
-                "Turkish": "Şanslısın ve doğru düğmeye basıp kurtuldun!"
-            },
-            "You Guessed wrong soooo... KABOOOOOM!!!!!": {
-                "Spanish": "Adivinaste mal así que... ¡¡¡KABUUUM!!!",
-                "French": "Tu as mal deviné alors... KABOOOOOM!!!!!",
-                "Turkish": "Yanlış tahmin ettin yani... KABOOOOM!!!!!"
-            },
-            "You are a couch potato so you run at 1 mph so the house explodes before you escaped": {
-                "Spanish": "Eres un vago así que corres a 1 km/h y la casa explota antes de que escapes",
-                "French": "Tu es un paresseux alors tu cours à 1 km/h et la maison explose avant que tu t'échappes",
-                "Turkish": "Kanepe patatessin yani 1 km/h koşuyorsun ve kaçmadan önce ev patlıyor"
-            },
-            "Sooooo whats your favorite drink?": {
-                "Spanish": "Entonces, ¿cuál es tu bebida favorita?",
-                "French": "Alors, quelle est ta boisson préférée?",
-                "Turkish": "Peki, en sevdiğin içecek ne?"
-            },
-            "Another question! Whats your favorite animal?": {
-                "Spanish": "¡Otra pregunta! ¿Cuál es tu animal favorito?",
-                "French": "Une autre question! Quel est ton animal préféré?",
-                "Turkish": "Başka bir soru! En sevdiğin hayvan ne?"
-            },
-            "Whats your favorite sport?": {
-                "Spanish": "¿Cuál es tu deporte favorito?",
-                "French": "Quel est ton sport préféré?",
-                "Turkish": "En sevdiğin spor ne?"
-            },
-            // === GUESSING GAMES ===
-            "Time for the guessing game! If you win you get to see something COOL! My number is between 1-4! ": {
-                "Spanish": "¡Hora del juego de adivinanzas! Si ganas verás algo GENIAL. ¡Mi número está entre 1-4!",
-                "French": "C'est l'heure du jeu de devinettes! Si tu gagnes, tu verras quelque chose de COOL! Mon nombre est entre 1-4!",
-                "Turkish": "Tahmin oyunu zamanı! Kazanırsan harika bir şey göreceksin! Numaram 1-4 arasında!"
-            },
-            "Time for the guessing game round 2! If you win you get to see something COOL! My number is between 1-10! ": {
-                "Spanish": "¡Hora del juego de adivinanzas ronda 2! Si ganas verás algo GENIAL. ¡Mi número está entre 1-10!",
-                "French": "C'est l'heure du jeu de devinettes round 2! Si tu gagnes, tu verras quelque chose de COOL! Mon nombre est entre 1-10!",
-                "Turkish": "Tahmin oyunu 2. tur! Kazanırsan harika bir şey göreceksin! Numaram 1-10 arasında!"
-            },
-            "Alright wanna do another one?": {
-                "Spanish": "¿Quieres hacer otro?",
-                "French": "Tu veux en faire un autre?",
-                "Turkish": "Bir tane daha yapmak ister misin?"
-            },
-            "Time for the guessing game round 3! If you win you get to see something COOL! My number is between 1-67! ": {
-                "Spanish": "¡Hora del juego de adivinanzas ronda 3! Si ganas verás algo GENIAL. ¡Mi número está entre 1-67!",
-                "French": "C'est l'heure du jeu de devinettes round 3! Si tu gagnes, tu verras quelque chose de COOL! Mon nombre est entre 1-67!",
-                "Turkish": "Tahmin oyunu 3. tur! Kazanırsan harika bir şey göreceksin! Numaram 1-67 arasında!"
-            },
-            "Okay!": {
-                "Spanish": "¡Vale!",
-                "French": "D'accord!",
-                "Turkish": "Tamam!"
-            },
-            "I say 6 you say???": {
-                "Spanish": "Yo digo 6 tú dices???",
-                "French": "Je dis 6 tu dis???",
-                "Turkish": "Ben 6 diyorum sen???diyorsun"
-            },
-            "67!!!": {
-                "Spanish": "¡¡¡67!!!",
-                "French": "67!!!",
-                "Turkish": "67!!!"
-            },
-            "Dude its simple its I say 6 you say 7 it makes 67!!!!! Got it?": {
-                "Spanish": "Amigo es simple, yo digo 6 tú dices 7 y hace 67!!!!! ¿Entendido?",
-                "French": "Mec c'est simple, je dis 6 tu dis 7 ça fait 67!!!!! Compris?",
-                "Turkish": "Dostum basit, ben 6 diyorum sen 7 diyorsun 67 oluyor!!!!! Anladın mı?"
-            },
-            // === ENDING ===
-            "Well I Hoped You Enjoyed Talking With Me!!!": {
-                "Spanish": "¡Espero que hayas disfrutado hablando conmigo!",
-                "French": "J'espère que tu as aimé parler avec moi!",
-                "Turkish": "Umarım benimle konuşmaktan keyif almışsındır!"
-            },
-            "You Have Reached The End Of This Conversation Have A Nice Day!": {
-                "Spanish": "Has llegado al final de esta conversación. ¡Que tengas un buen día!",
-                "French": "Tu as atteint la fin de cette conversation. Bonne journée!",
-                "Turkish": "Bu konuşmanın sonuna ulaştın. İyi günler!"
-            },
-            // === DYNAMIC RESPONSES (templates with placeholders) ===
-            "? Awesome!!!!!!!!!!!!!!!!!!": {
-                "Spanish": "? ¡Increíble!!!!!!!!!!!!!!!!",
-                "French": "? Génial!!!!!!!!!!!!!!!!",
-                "Turkish": "? Harika!!!!!!!!!!!!!!!!"
-            },
-            "?!?!?! I'VE BEEN CRAVING THAT ALL DAY!!!": {
-                "Spanish": "?!?!?! ¡HE ESTADO DESEANDO ESO TODO EL DÍA!",
-                "French": "?!?!?! J'EN AI ENVIE DEPUIS CE MATIN!",
-                "Turkish": "?!?!?! BÜTÜN GÜN ONU ÇOK İSTİYORDUM!"
-            },
-            "? Awesome!": {
-                "Spanish": "? ¡Increíble!",
-                "French": "? Génial!",
-                "Turkish": "? Harika!"
-            },
-            "s awesome!!!": {
-                "Spanish": " ¡es increíble!",
-                "French": " c'est génial!",
-                "Turkish": "ler harika!!!"
-            },
-            "? Fun!!!": {
-                "Spanish": "? ¡Divertido!",
-                "French": "? Amusant!",
-                "Turkish": "? Eğlenceli!!!"
-            },
-            "? Cool!": {
-                "Spanish": "? ¡Genial!",
-                "French": "? Cool!",
-                "Turkish": "? Havalı!"
-            },
-            // === BUTTON TRANSLATIONS ===
-            "Yes": {
-                "Spanish": "Sí",
-                "French": "Oui",
-                "Turkish": "Evet"
-            },
-            "No": {
-                "Spanish": "No",
-                "French": "Non",
-                "Turkish": "Hayır"
-            },
-            "Taco": {
-                "Spanish": "Taco",
-                "French": "Taco",
-                "Turkish": "Tako"
-            },
-            "Burrito": {
-                "Spanish": "Burrito",
-                "French": "Burrito",
-                "Turkish": "Burrito"
-            },
-            "Admit": {
-                "Spanish": "Admitir",
-                "French": "Admettre",
-                "Turkish": "Kabul Et"
-            },
-            "Deny": {
-                "Spanish": "Negar",
-                "French": "Nier",
-                "Turkish": "İnkar Et"
-            },
-            "No Cap": {
-                "Spanish": "Sin Mentir",
-                "French": "Sans Mentir",
-                "Turkish": "Ciddi"
-            },
-            "I am a Capper": {
-                "Spanish": "Soy un Mentiroso",
-                "French": "Je suis un Menteur",
-                "Turkish": "Yalancıyım"
-            },
-            "Legit Dont Know": {
-                "Spanish": "Realmente No Sé",
-                "French": "Je Ne Sais Vraiment Pas",
-                "Turkish": "Gerçekten Bilmiyorum"
-            },
-            "Meat": {
-                "Spanish": "Carne",
-                "French": "Viande",
-                "Turkish": "Et"
-            },
-            "Herbs": {
-                "Spanish": "Hierbas",
-                "French": "Herbes",
-                "Turkish": "Otlar"
-            },
-            "Veggies": {
-                "Spanish": "Verduras",
-                "French": "Légumes",
-                "Turkish": "Sebzeler"
-            },
-            "Fruits": {
-                "Spanish": "Frutas",
-                "French": "Fruits",
-                "Turkish": "Meyveler"
-            },
-            "Air": {
-                "Spanish": "Aire",
-                "French": "Air",
-                "Turkish": "Hava"
-            },
-            "Eenie Meenie Minie Moe?": {
-                "Spanish": "¿De tin marín?",
-                "French": "Am stram gram?",
-                "Turkish": "Rastgele Seç?"
-            },
-            "Guess?": {
-                "Spanish": "¿Adivinar?",
-                "French": "Deviner?",
-                "Turkish": "Tahmin Et?"
-            },
-            "RUN AWAY": {
-                "Spanish": "HUIR",
-                "French": "S'ENFUIR",
-                "Turkish": "KAÇ"
-            },
-            "Some of it": {
-                "Spanish": "Algo de eso",
-                "French": "Un peu",
-                "Turkish": "Biraz"
-            },
-            "Idk": {
-                "Spanish": "No sé",
-                "French": "Je sais pas",
-                "Turkish": "Bilmiyorum"
-            },
-            "7!": {
-                "Spanish": "7!",
-                "French": "7!",
-                "Turkish": "7!"
-            },
-            "Seven!": {
-                "Spanish": "¡Siete!",
-                "French": "Sept!",
-                "Turkish": "Yedi!"
-            },
-            "...": {
-                "Spanish": "...",
-                "French": "...",
-                "Turkish": "..."
-            }
-        };
-        
-        // Store current language globally
-        let currentLanguage = 'English';
-        
-        // Translation function
-        function translate(text) {
-            if (currentLanguage === 'English') return text;
-            
-            // Clean text for comparison (remove | borders)
-            let cleanText = text;
-            if (text.startsWith('|') && text.endsWith('|')) {
-                cleanText = text.slice(1, -1);
-            }
-            
-            // Check for exact match (with cleaned text)
-            if (translations[cleanText] && translations[cleanText][currentLanguage]) {
-                if (text.startsWith('|')) {
-                    return '|' + translations[cleanText][currentLanguage] + '|';
-                }
-                return translations[cleanText][currentLanguage];
-            }
-            
-            // Check for exact match (original text)
-            if (translations[text] && translations[text][currentLanguage]) {
-                return translations[text][currentLanguage];
-            }
-            
-            // Check for partial matches (for dynamic text with variables)
-            for (let key in translations) {
-                if (text.includes(key) && translations[key][currentLanguage]) {
-                    text = text.replace(key, translations[key][currentLanguage]);
-                }
-            }
-            return text;
-        }
+<main>
+<div id="home" class="screen on">
+  <img id="logo" src="data:image/gif;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" alt="Stuff Lingo logo">
+  <h1>Stuff Lingo</h1>
+  <p class="sub">Learn the language of the internet, 5 minutes at a time.</p>
+  <button id="play" aria-label="Open Brainrot course"><img id="pimg" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABm0lEQVR4AeyW3W3DMAyE/XWKbtIx+t4JukCn6AKdoO8do5t0Czcn4RTasgw5MGwgSJALf44Sz5QM5Gk4+fMQ4AmMl5M4A4MFDOM4HorLA6dvEaAIkOkGbKtf2ngiQAXAAMhNFqY+5FgFmpossFjb4pQ3KgHe1AUxjr54QCZhzsXYPuR6yFYLKwFwJVUQAZmDbCO35kOutxBbrZkIEGGIlC8ryI9wbs2a8zrHssZEgJNH2l0FAOUywtVfe6BdBajR98fLEKHcGnYX8Pb5u9av4roFQB5ptcMsoad3qkdMlwBgeH99ToB1IbFpFGNRc9slQK/R189fWhuFpMTCj0QYC/Qk1SVAK6IIxS3oqSNadc53C/CClgVaVHo1W+QmAfMpAGlzIL16rSaaCLBIbxLgHXwfHKuBfZ39kq8aqEVsFqApCGqiCymrpoLz8gVxyskX5CsXsVlAXOxJaGPBnHyhFTsve7MANTC0kQD1iKHOqdYoAoByoeA235tCXj+PIecBU+VPqTJnoAgoio52yhEc3dj9HgLufwI+65b9BwAA//+3i7XHAAAABklEQVQDAJHCKVAOmGGeAAAAAElFTkSuQmCC" alt="Brainrot course"></button>
+  <div class="hint">Tap the Brainrot course to start</div>
+</div>
 
-        class ConversationGame {
-            constructor() {
-                this.textArea = document.getElementById('text-area');
-                this.userInput = document.getElementById('user-input');
-                this.submitBtn = document.getElementById('submit-btn');
-                this.choicesDiv = document.getElementById('choices');
-                this.lastAnswer = '';
-                this.audioContext = null;
-                this.inputResolver = null;
-                this.submitBtn.addEventListener('click', () => this.submitAnswer());
-                this.userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.submitAnswer(); });
-                setTimeout(() => this.startGame(), 500);
-            }
-            writeText(text) {
-                const msg = document.createElement('div');
-                msg.className = 'message';
-                msg.textContent = translate(String(text));
-                this.textArea.appendChild(msg);
-                this.textArea.scrollTop = this.textArea.scrollHeight;
-            }
-            async askQuestion(question) {
-                this.writeText(question);
-                this.userInput.classList.remove('hidden');
-                this.submitBtn.classList.remove('hidden');
-                this.choicesDiv.innerHTML = '';
-                this.userInput.value = '';
-                this.userInput.focus();
-                return new Promise(resolve => { this.inputResolver = resolve; });
-            }
-            submitAnswer() {
-                if (this.inputResolver) {
-                    const answer = this.userInput.value;
-                    this.lastAnswer = answer;
-                    if (answer.trim()) {
-                        const msg = document.createElement('div');
-                        msg.className = 'message user';
-                        msg.textContent = '> ' + answer;
-                        this.textArea.appendChild(msg);
-                    }
-                    this.userInput.value = '';
-                    this.textArea.scrollTop = this.textArea.scrollHeight;
-                    const resolver = this.inputResolver;
-                    this.inputResolver = null;
-                    resolver(answer);
-                }
-            }
-            async showChoices(question, options) {
-                this.writeText(question);
-                this.userInput.classList.add('hidden');
-                this.submitBtn.classList.add('hidden');
-                this.choicesDiv.innerHTML = '';
-                return new Promise(resolve => {
-                    options.forEach(opt => {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn-choice';
-                        // Check if this is a language option - don't translate language names
-                        const isLangOption = ['English', 'Spanish', 'French', 'Turkish'].includes(opt);
-                        btn.textContent = isLangOption ? opt : translate(opt);
-                        btn.addEventListener('click', () => {
-                            // If this is the language selection, store the choice IMMEDIATELY
-                            if (isLangOption) {
-                                currentLanguage = opt;
-                                console.log('Language set to:', currentLanguage);
-                            }
-                            const msg = document.createElement('div');
-                            msg.className = 'message user';
-                            msg.textContent = '> ' + opt;
-                            this.textArea.appendChild(msg);
-                            this.textArea.scrollTop = this.textArea.scrollHeight;
-                            this.choicesDiv.innerHTML = '';
-                            this.userInput.classList.remove('hidden');
-                            this.submitBtn.classList.remove('hidden');
-                            this.lastAnswer = opt;  // Keep original English value for game logic!
-                            resolve(opt);
-                        });
-                        this.choicesDiv.appendChild(btn);
-                    });
-                });
-            }
-            async beep(freq, duration) {
-                try {
-                    if (!this.audioContext) this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = this.audioContext.createOscillator();
-                    const gainNode = this.audioContext.createGain();
-                    oscillator.connect(gainNode);
-                    gainNode.connect(this.audioContext.destination);
-                    oscillator.frequency.value = freq;
-                    oscillator.type = 'square';
-                    gainNode.gain.value = 0.1;
-                    oscillator.start();
-                    await new Promise(r => setTimeout(r, duration));
-                    oscillator.stop();
-                } catch (e) {}
-            }
-            async startGame() {
-                try {
-                this.writeText('==================================================');
-                this.writeText('     WELCOME TO THE CONVERSATION GAME!');
-                this.writeText('==================================================');
-                this.writeText(' ');
-                this.writeText('Please select your language / Por favor selecciona tu idioma');
-                this.writeText('Lutfen dilinizi secin / Veuillez choisir votre langue');
-                this.writeText(' ');
-                this.lastAnswer = await this.showChoices('SELECT YOUR LANGUAGE:', ['English', 'Turkish', 'Spanish', 'French']);
-                var gameLanguage = this.lastAnswer;
-                this.writeText(' ');
-                this.writeText('==================================================');
-                this.writeText(' ');
-                this.writeText('                               __________________      ___________________           /\\         ___________      __________________');
-                this.writeText('                              |                               |                     /  \\        |         |              |');
-                this.writeText('                              |                               |                    /    \\       |         |              |');
-                this.writeText('                              |__________________             |                   /      \\      |_________|              |');
-                this.writeText('                                                 |            |                  /________\\     |          \\             |');
-                this.writeText('                                                 |            |                 /          \\    |           \\            |');
-                this.writeText('                               __________________|            |                /            \\   |            \\           |');
-                this.writeText(' ');
-                await this.beep(523, 80);
-                await this.beep(587, 80);
-                await this.beep(659, 80);
-                await this.beep(587, 80);
-                await this.beep(523, 80);
-                await this.beep(392, 80);
-                await this.beep(440, 80);
-                await this.beep(523, 150);
-                this.writeText(' ');
-                this.writeText(' ');
-                this.writeText('|================================================================================================================================================================================|');
-                this.writeText('|READ THIS IS IMPORTANT   Reply To Stuff I Say And When Answering multi choice you need to write EXACTLY the option you\'re choosing! Same uppercases no extra punctuation or else|');
-                this.writeText('|It wont work! Press Enter To Skip Lines Don\'t do that on the guessing games though!      Enlarge For Better Experience!                                                        |');
-                this.writeText('|================================================================================================================================================================================|');
-                this.lastAnswer = await this.showChoices('Welcome To The Game, Want A Tutorial? Type', ['Yes', 'No']);
-                var q10 = this.lastAnswer;
-                if (String(q10) === 'Yes') {
-                    this.lastAnswer = await this.askQuestion('This is a question you can type to reply or press enter to skip!');
-                    this.writeText('But there are some stuff you cant answer such as this!');
-                    this.lastAnswer = String(Math.floor(Math.random() * (2 - 1 + 1)) + 1);
-                    var secretNumber = this.lastAnswer;
-                    this.lastAnswer = await this.askQuestion('There are also guessing games where I think of a number and you try to guess it! I am thinking of a number 1-2, remember if you type anything other than a number, it will break this conversation so you have to restart by closing and reopening the app! Guess!  ');
-                    var guess = this.lastAnswer;
-                    if (String(guess) === String(secretNumber)) {
-                        this.writeText('NICE JOB!  \\(*o*)/');
-                        await this.beep(523, 80);
-                        await this.beep(659, 80);
-                        await this.beep(784, 80);
-                        await this.beep(1047, 230);
-                        this.writeText('It indeed was ' + secretNumber + '!!!');
-                    }
-                    if (parseInt(guess) > parseInt(secretNumber)) {
-                        this.writeText('Too high! Try again next time! :D');
-                    }
-                    if (parseInt(guess) < parseInt(secretNumber)) {
-                        this.writeText('Too low! Try again next time! :D');
-                    }
-                    this.lastAnswer = await this.showChoices('There are some multi-choice questions such as this! The option you choose changes the response! Choose one now!Make sure all uppercases are the same and no extra punctuation is added while you write you choice!', ['Taco', 'Burrito']);
-                    var q11 = this.lastAnswer;
-                    if (String(q11) === 'Taco') {
-                        this.writeText('Taco GANG!!!');
-                    }
-                    if (String(q11) === 'Burrito') {
-                        this.writeText('Burrito RULES!!!');
-                    }
-                    this.lastAnswer = await this.askQuestion('Oh and there are also sounds time to time reply to this to listen! :D');
-                    await this.beep(523, 200);
-                    await this.beep(659, 200);
-                    await this.beep(784, 200);
-                    await this.beep(1000, 200);
-                    await this.beep(1500, 1000);
-                    this.lastAnswer = await this.askQuestion('Alright that\'s all! Reply to finish!');
-                }
-                if (String(q10) === 'No') {
-                    this.writeText('Okay your loss! ');
-                }
-                this.lastAnswer = await this.showChoices('Ready For Some Fun???  ', ['Yes', 'No']);
-                var q14 = this.lastAnswer;
-                if (String(q14) === 'Yes') {
-                    this.lastAnswer = await this.askQuestion('MEOW MEOW MEOW MEOW MEOW MEOW  ');
-                    this.lastAnswer = await this.askQuestion('WOOF WOOF WOOF WOOF WOOF WOOF  ');
-                    this.lastAnswer = await this.askQuestion('BAAA BAAA BAAA BAAA BAAA BAAA  ');
-                    this.lastAnswer = await this.askQuestion('HISS HISS HISS HISS HISS HISS  ');
-                    this.lastAnswer = await this.askQuestion('What? Did I Say Somthing?  ');
-                    var name = this.lastAnswer;
-                    this.writeText(name + '? ');
-                    this.lastAnswer = await this.askQuestion('Really? Are you sure about that 😏');
-                    this.lastAnswer = await this.askQuestion('Alright Alright I was just messin with ya...  ');
-                }
-                if (String(q14) === 'No') {
-                    this.writeText(':C you\'re no fun');
-                }
-                this.lastAnswer = await this.askQuestion('Let me get to know you better whats your name?  ');
-                var name = this.lastAnswer;
-                this.writeText('Alright ' + name + '!!!');
-                this.lastAnswer = await this.askQuestion('Now let me get to know your age how old are you?');
-                var age = this.lastAnswer;
-                this.writeText('Awesome You Are ' + age + ' Years Old!!!');
-                this.writeText('You\'re almost older than my great great great great great great great great grandpa XD');
-                this.writeText('Just joking he was a 1000 years old he died a loooong time ago sigh...');
-                this.lastAnswer = await this.askQuestion('I Miss The Old Man 😢  ');
-                this.lastAnswer = await this.askQuestion('Well to get our minds of the topic whats your favorite color?');
-                var color = this.lastAnswer;
-                this.writeText('Realy??? ' + color + '? Its my favorite color to!!!');
-                this.writeText('Alright lets get you to do some math!!!');
-                this.lastAnswer = await this.askQuestion(' What is 17^2 x 19^18 + 1234???');
-                this.writeText(' Its equal to.....');
-                this.writeText(' 1.417112664857723e+24 🤓  ');
-                this.lastAnswer = await this.askQuestion(' Am I Not The Smartest Guy On Earth???');
-                var smartAnswer = this.lastAnswer;
-                this.writeText(' I Knew you\'d say ' + smartAnswer + '! Am I Right?😏');
-                this.lastAnswer = await this.askQuestion('Wanna Hear A Riddle?');
-                this.lastAnswer = await this.askQuestion(' Well I Was Gonna Tell you Anyway!');
-                this.lastAnswer = await this.askQuestion('This is the riddle! One day, a magician was boasting about how long he could hold his breath underwater. His record was 6 minutes. A kid that was listening said, \'that\'s nothing, I can stay underwater for 10 minutes using no equipment or air pockets!\' The magician told the kid if he could do that, he\'d give him $10,000. The kid did it and won the money. How?  ');
-                this.writeText('He Got A Glass Of Water and Held it Above his head for 10 minutes and got the money!!!');
-                await this.beep(784, 80);
-                await this.beep(1047, 180);
-                this.lastAnswer = await this.askQuestion(' Do You Want Me To Press The Big Red Button?  ');
-                this.lastAnswer = await this.askQuestion(' OOOOOOPPPS  My hand Slipped 👉🔴  ');
-                for (var _i = 0; _i < 3; _i++) {
-                    this.writeText('        _/\\\\___/\\\\_       ');
-                    this.writeText('        / ^     ^ \\\\       ');
-                    this.writeText('  d-----| |_____| ||-----b');
-                    this.writeText('        |_________||      ');
-                }
-                this.lastAnswer = await this.askQuestion('Bored?  ');
-                this.writeText('Yeah I Thought So');
-                this.lastAnswer = await this.askQuestion('So I Made Youuuuu...');
-                this.writeText(' A SUPER EXPENETIALY DUPER SHORT POP QUIZZZZZZ');
-                await this.beep(392, 120);
-                await this.beep(523, 120);
-                await this.beep(659, 180);
-                this.lastAnswer = await this.showChoices(' Do you like this? Be HONEST ', ['Yes', 'No', 'Some of it', 'Idk']);
-                var q1 = this.lastAnswer;
-                if (String(q1) === 'Yes') {
-                    this.writeText(' YAY  ___________');
-                    this.writeText('     / o     o   \\\\');
-                    this.writeText(' d---| \\\\_____/    |---b');
-                }
-                if (String(q1) === 'No') {
-                    this.writeText(' WAHH ______________');
-                    this.writeText('     / o_______ o   \\\\');
-                    this.writeText(' p---| /        \\\\   |---p');
-                }
-                if (String(q1) === 'Some of it') {
-                    this.writeText('Ok');
-                }
-                if (String(q1) === 'Idk') {
-                    await this.beep(200, 180);
-                    await this.beep(150, 180);
-                    await this.beep(100, 180);
-                    for (var _i = 0; _i < 100; _i++) {
-                        this.writeText('010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101');
-                    }
-                }
-                this.lastAnswer = await this.askQuestion('So Whatcha doing today?');
-                var activity = this.lastAnswer;
-                this.writeText(activity + '? Cool!');
-                this.lastAnswer = await this.showChoices(' Do you want to know more about me?  ', ['Yes', 'No', 'Legit Dont Know']);
-                var q1 = this.lastAnswer;
-                if (String(q1) === 'Yes') {
-                    this.lastAnswer = await this.showChoices('I\'m a Robot did you know that before?   ', ['Yes', 'No']);
-                    var q2 = this.lastAnswer;
-                    if (String(q2) === 'No') {
-                        this.writeText('Well now you do!');
-                    }
-                    if (String(q2) === 'Yes') {
-                        this.writeText('Smarty Pants!');
-                    }
-                }
-                if (String(q1) === 'No') {
-                    this.lastAnswer = await this.showChoices('Wow not cool man not cool. Are you a meanie beanie? >:C', ['Admit', 'Deny']);
-                    var q3 = this.lastAnswer;
-                    if (String(q3) === 'Deny') {
-                        this.writeText('>:C');
-                    }
-                    if (String(q3) === 'Admit') {
-                        this.lastAnswer = await this.askQuestion('Thank you for taking resposbility for your actions d-^o^-b');
-                    }
-                }
-                if (String(q1) === 'Legit Dont Know') {
-                    this.lastAnswer = await this.showChoices('No Cap?', ['No Cap', 'I am a Capper']);
-                    var q4 = this.lastAnswer;
-                    if (String(q4) === 'No Cap') {
-                        this.writeText('Okay then I will ask you again');
-                    }
-                    if (String(q4) === 'I am a Capper') {
-                        this.writeText('I Knew It! NOW ANWSER THE QUESTION');
-                    }
-                    this.lastAnswer = await this.showChoices(' Do you want to know more about me?  ', ['Yes', 'No']);
-                    var q5 = this.lastAnswer;
-                    if (String(q5) === 'Yes') {
-                        this.lastAnswer = await this.showChoices('I\'m a Robot did you know that before?   ', ['Yes', 'No']);
-                        var q6 = this.lastAnswer;
-                        if (String(q6) === 'No') {
-                            this.writeText('Well now you do!');
-                        }
-                        if (String(q6) === 'Yes') {
-                            this.writeText('Smarty Pants!');
-                        }
-                    }
-                    if (String(q5) === 'No') {
-                        this.lastAnswer = await this.showChoices('Wow not cool man not cool. Are you a meanie beanie? >:C', ['Admit', 'Deny']);
-                        var q7 = this.lastAnswer;
-                        if (String(q7) === 'Deny') {
-                            this.writeText('>:C');
-                        }
-                        if (String(q7) === 'Admit') {
-                            this.writeText('Thank you for taking resposbility for your actions d-^o^-b');
-                        }
-                    }
-                }
-                this.writeText('Yay Nice Job Finishing The Pop QUIZZZZ');
-                this.lastAnswer = await this.showChoices(' Now tell me which one of these do you like the most?', ['Meat', 'Herbs', 'Veggies', 'Fruits', 'Air']);
-                var q8 = this.lastAnswer;
-                if (String(q8) === 'Meat') {
-                    this.writeText('Pft Carnivore');
-                }
-                if (String(q8) === 'Herbs') {
-                    this.writeText('Fun Fact Did You Know Bananas Are Herbs?');
-                }
-                if (String(q8) === 'Veggies') {
-                    this.writeText('So you like broccili? Realy man?');
-                }
-                if (String(q8) === 'Fruits') {
-                    this.writeText('An Apple A Day Keeps the Doctor Away!');
-                }
-                if (String(q8) === 'Air') {
-                    this.writeText('Okay Okay');
-                }
-                this.lastAnswer = await this.askQuestion('So whats your favorite game? Tag? Mincraft? Pacman? Somthin Else?');
-                var favGame = this.lastAnswer;
-                this.writeText(favGame + '? Awesome!!!!!!!!!!!!!!!!!!');
-                this.lastAnswer = await this.askQuestion('Time for another question! What is your favorite restaraunt?');
-                var restaurant = this.lastAnswer;
-                this.writeText(restaurant + '?!?!?! I\'VE BEEN CRAVING THAT ALL DAY!!!');
-                this.lastAnswer = await this.showChoices('Alright 1 minute till your house explodes there are 3 buttons 1 of them prevents the pending explosion and the other to make the time go to 0 seconds left what would you do?', ['Eenie Meenie Minie Moe?', 'Guess?', 'RUN AWAY']);
-                var q9 = this.lastAnswer;
-                if (String(q9) === 'Eenie Meenie Minie Moe') {
-                    this.writeText('You get luck and press the correct button and you get saved!');
-                }
-                if (String(q9) === 'Guess') {
-                    this.writeText('You Guessed wrong soooo... KABOOOOOM!!!!!');
-                }
-                if (String(q9) === 'RUN AWAY') {
-                    this.writeText('You are a couch potato so you run at 1 mph so the house explodes before you escaped');
-                }
-                this.lastAnswer = await this.askQuestion('Sooooo whats your favorite drink?');
-                var drink = this.lastAnswer;
-                this.writeText(drink + '? Awesome!');
-                this.lastAnswer = await this.askQuestion('Another question! Whats your favorite animal?');
-                var animal = this.lastAnswer;
-                this.writeText(animal + 's awesome!!!');
-                this.lastAnswer = await this.askQuestion('Whats your favorite sport?');
-                var sport = this.lastAnswer;
-                this.writeText(sport + '? Fun!!!');
-                this.lastAnswer = String(Math.floor(Math.random() * (4 - 1 + 1)) + 1);
-                var secretNumber = this.lastAnswer;
-                this.lastAnswer = await this.askQuestion('Time for the guessing game! If you win you get to see something COOL! My number is between 1-4! ');
-                var guess = this.lastAnswer;
-                if (String(guess) === String(secretNumber)) {
-                    this.writeText('NICE JOB!  \\(*o*)/');
-                    await this.beep(523, 80);
-                    await this.beep(659, 80);
-                    await this.beep(784, 80);
-                    await this.beep(1047, 230);
-                    this.writeText('It indeed was ' + secretNumber + '!!!');
-                }
-                if (parseInt(guess) > parseInt(secretNumber)) {
-                    this.writeText('Too high! Try again next time! :D');
-                }
-                if (parseInt(guess) < parseInt(secretNumber)) {
-                    this.writeText('Too low! Try again next time! :D');
-                }
-                this.lastAnswer = String(Math.floor(Math.random() * (10 - 1 + 1)) + 1);
-                var secretNumber = this.lastAnswer;
-                this.lastAnswer = await this.askQuestion('Time for the guessing game round 2! If you win you get to see something COOL! My number is between 1-10! ');
-                var guess = this.lastAnswer;
-                if (String(guess) === String(secretNumber)) {
-                    this.writeText('NICE JOB!  \\(*o*)/');
-                    await this.beep(523, 80);
-                    await this.beep(659, 80);
-                    await this.beep(784, 80);
-                    await this.beep(1047, 230);
-                    this.writeText('It indeed was ' + secretNumber + '!!!');
-                }
-                if (parseInt(guess) > parseInt(secretNumber)) {
-                    this.writeText('Too high! Try again next time! :D');
-                }
-                if (parseInt(guess) < parseInt(secretNumber)) {
-                    this.writeText('Too low! Try again next time! :D');
-                }
-                this.lastAnswer = await this.showChoices('Alright wanna do another one?', ['Yes', 'No']);
-                var q12 = this.lastAnswer;
-                if (String(q12) === 'Yes') {
-                    this.lastAnswer = String(Math.floor(Math.random() * (67 - 1 + 1)) + 1);
-                    var secretNumber = this.lastAnswer;
-                    this.lastAnswer = await this.askQuestion('Time for the guessing game round 3! If you win you get to see something COOL! My number is between 1-67! ');
-                    var guess = this.lastAnswer;
-                    if (String(guess) === String(secretNumber)) {
-                        this.writeText('NICE JOB!  \\(*o*)/');
-                        await this.beep(523, 80);
-                        await this.beep(659, 80);
-                        await this.beep(784, 80);
-                        await this.beep(1047, 230);
-                        this.writeText('It indeed was ' + secretNumber + '!!!');
-                    }
-                    if (parseInt(guess) > parseInt(secretNumber)) {
-                        this.writeText('Too high! Try again next time! :D');
-                    }
-                    if (parseInt(guess) < parseInt(secretNumber)) {
-                        this.writeText('Too low! Try again next time! :D');
-                    }
-                }
-                if (String(q12) === 'No') {
-                    this.writeText('Okay!');
-                }
-                this.lastAnswer = await this.showChoices('I say 6 you say???', ['7!', 'Seven!', '...']);
-                var q13 = this.lastAnswer;
-                if (String(q13) === '7') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '7!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '7!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '7!!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === 'Seven!!!') {
-                    this.writeText('67!!!');
-                }
-                if (String(q13) === '...') {
-                    this.writeText('Dude its simple its I say 6 you say 7 it makes 67!!!!! Got it?');
-                }
-                this.lastAnswer = await this.askQuestion('Well I Hoped You Enjoyed Talking With Me!!!');
-                this.writeText('|====================================================================================================================================================================|');
-                this.writeText('|                                                   You Have Reached The End Of This Conversation Have A Nice Day!                                                   |');
-                this.writeText('|====================================================================================================================================================================|');
-                await this.beep(523, 120);
-                await this.beep(587, 120);
-                await this.beep(659, 120);
-                await this.beep(784, 120);
-                await this.beep(880, 120);
-                await this.beep(1047, 300);
-                this.writeText('');
-                this.writeText('');
-                } catch (e) {
-                    console.error('Game error:', e);
-                    this.writeText('Game ended or error occurred.');
-                }
-            }
-        }
-        new ConversationGame();
-    </script>
-</body>
-</html>
+<div id="path" class="screen">
+  <div class="pathtop"><button class="sbtn" id="home2">◀ Home</button><div id="pxp"></div></div>
+    <div id="msg"></div>
+  <div id="tbox" class="tbox" style="display:none"><div id="ttxt"></div><div style="margin-top:14px"><button class="big" id="tgo">Start test</button><button class="sbtn" id="tno">Cancel</button></div></div>
+  <div id="track"></div>
+  <button class="sbtn" id="unlock" style="margin-right:10px">Unlock all (giant test)</button><button class="sbtn" id="reset">Reset progress</button>
+</div>
+
+<div id="quiz" class="screen">
+  <div class="top"><button class="sbtn" id="quit">✕</button><div class="bar"><div id="fill"></div></div><div id="hearts"></div></div>
+  <div id="tl" class="tl" style="display:none">TEST OUT: pass to jump ahead!</div>
+  <img id="qpic" class="pic" alt="" style="display:none">
+  <h2 id="q"></h2>
+  <div id="opts"></div>
+  <div id="fb"></div>
+  <button class="big" id="next" style="display:none">Continue</button>
+  <div id="skipwrap" style="display:none"><button class="sbtn" id="skip">Skip lesson (test out)</button></div>
+</div>
+
+<div id="end" class="screen">
+  <img id="eimg" class="sm" src="data:image/gif;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" alt="">
+  <h1 id="et"></h1>
+  <div id="xp"></div>
+  <p class="sub" id="es"></p>
+  <button class="big" id="again">Back to path</button>
+</div>
+</main>
+<button class="sbtn" id="mute" style="position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);font-size:.55rem">SFX ON</button>
+<script>
+var AC=null,muted=false;
+try{muted=localStorage.getItem("sl_mute")==="1"}catch(e){}
+var SFX={click:[[660,0,.05]],ok:[[523,0,.08],[659,.08,.08],[988,.16,.2]],no:[[196,0,.15,"sawtooth"],[147,.15,.3,"sawtooth"]],go:[[392,0,.07],[523,.07,.07],[659,.14,.14]],bonk:[[130,0,.08],[98,.08,.14]],win:[[523,0,.1],[659,.1,.1],[784,.2,.1],[1047,.3,.12],[784,.42,.08],[1047,.5,.35]],lose:[[392,0,.18,"triangle"],[330,.18,.18,"triangle"],[262,.36,.18,"triangle"],[196,.54,.45,"triangle"]]};
+function sfx(n){
+  if(muted)return;
+  try{
+    if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended")AC.resume();
+    SFX[n].forEach(function(x){
+      var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+x[1];
+      o.type=x[3]||"square";o.frequency.setValueAtTime(x[0],t);
+      g.gain.setValueAtTime(.07,t);g.gain.exponentialRampToValueAtTime(.001,t+x[2]);
+      o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+x[2]+.02);
+    });
+  }catch(e){}
+}
+var $=function(id){return document.getElementById(id)};
+var st={done:0,xp:0};
+try{var sv=JSON.parse(localStorage.getItem("sl_prog"));if(sv&&typeof sv.done==="number")st=sv}catch(e){}
+function save(){try{localStorage.setItem("sl_prog",JSON.stringify(st))}catch(e){}}
+function px(p,c){var r="";p.forEach(function(row,y){for(var x=0;x<row.length;x++)if(row[x]=="X")r+="<rect x='"+x+"' y='"+y+"' width='1' height='1'/>"});
+ return "data:image/svg+xml,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 "+p.length+"' shape-rendering='crispEdges' fill='"+c+"'>"+r+"</svg>")}
+var HP=[".XX.XX.","XXXXXXX","XXXXXXX",".XXXXX.","..XXX..","...X..."];
+var IC={done:px(["......X",".....XX","X...XX.",".XXXX..","..XX..."],"#2f9e00"),
+ cur:px(["...X...","..XXX..","XXXXXXX",".XXXXX.","..XXX..",".XX.XX.",".X...X."],"#ffb100"),
+ lock:px(["..XXX..",".X...X.",".X...X.","XXXXXXX","XXXXXXX","XXX.XXX","XXXXXXX"],"#8d8aa3")};
+var NI="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAnUlEQVR4AeyUUQrDMAxDrd3/zpkVSr828ryfsaESNQ7IshAkj/ryFwNJIAn8XAKrnw2CprE1ScCDmWoV5hIDFjNqrYVwuXSPcR1fb8TA7vTwXYDfhIsNgLkfUWIgCSSBJEASkF8YaW8uj5Bu7l28ayIG3LuFJJV0hhsaahwXNWAhJGhiA3MnBlq3LExgLsLUABKdkGIgCfx/Aqcb8QQAAP//9BPVBAAAAAZJREFUAwBkNjRBmDEQ6QAAAABJRU5ErkJgggAA",NA="data:image/gif;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+var IMG={tung:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABW0lEQVR4AeyV21HDQAxF91IFVEIZ8E0FUABV0AAV8E8ZdEIXhuOgRY61D+KxPcx4JjeSpbV0VruZXKWUhj0FwHf//T4TgGEY0hby280ANPaJNX3fKwOs2bBW+wA4JnBM4P9PQFKSflX7zUe5RROQlN6ebyeSFPUpxhYBUPXh5QMzyvtjoONrMQATsD7et1jLVgGk9jjZtVer4Xm+CCApPd5djxfs/CX/zK69fK7HDwGkU3MK9ECw7lKFAPxfv75/5poRhFQ+Hqmcy0V/nBCAnEF4EEnjkUinnx/rInEkkqLULFYEYCUQyCCYBHEaYGtijdSGqAJYAyDMx9qtJ26+WR/DZ31NXQBWwCZBYWRxfFR6tnhkuwFoYIoKXRrrBogaSPMzluax6F2LZYCn+5v0V3Epkb2Hj+y5ZmcAdr6WWNP6XnkCNCSxhehlmgBYcEsLALdmNwGw6oZbxb8AAAD//x4h83sAAAAGSURBVAMAH1A0UALloBQAAAAASUVORK5CYIIA",trala:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABEElEQVR4AeyWAQrCMAxF88WjeBiP7GEUPIgy82Ir3SxON7aBFPpJ8oP5v0G27cys2xIYcP3tTs9A13W2BsrrhoEsWjaWzEu9MLCk2NjsZqBtoG2gbaBtoG3gPzYgyaQnxt5+w/7sDUgyO/pXHfDpksKMp1+dWQYkPcWzFCaA15L3PI6dyQYkF0Ds5LFUoYZ3TlJsQ5JX9TPZwGtcEqvW9MCr+Z7MN8CNh8g6iecbMFPDON8ANxwiqSAMUlkNkw3E4HRDq8ToVyX75GQDd/9j3dIsxDKg4OmTjyEMXO6yX3F1FXD2WP6WGh6UfC3HXBg47M0AxBpAC6AVBkgA5BpAK6NnIJNrRgzwmFoMfpmPsx8AAAD//506PcIAAAAGSURBVAMAXQjyQaZHH5AAAAAASUVORK5CYIIA",bomb:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABZUlEQVR4AeyWUXKDMAxE9dqr9FbJX6en6vQvuVWv0qFeezy1YgQ0hCQfzHiRkWTtIjuBFzMbHgkJSPyPG07AMAx2D7SPmwVU0jaw5bzlywK2JJurvQvYO/C8HQAMPOZO9DXx2Q58fp2sArwg4BpOtyYUoD8Ll5luqpBqk6sbQO5cFwgcoYAg37klBAohFFsToNwD1TVqOwFAfgIgL/h4P9oUcpIuwyG9V0eQYlBqpWk3nAAoiXqy/8BE3pT+/jmbkF2KJUCpnX3NxQmQX8Sya/D2ejBhSY1OwJJFUc5gpxyKbA5eXDoBU/sdxWpN7JinnQ3ar2QnQD+9FkrQlkRQXPnG2SZh6Xymj51kuuEEdNEJh7pRwxIxh5p7aUMBUE6tiMagQiKVXYNQQC0qkgg1Z40NBVTSNcWXrA0FLFl8i5xdwHN0AMhvwFvs6ZIa8MfnOgAlANvaVqQT0AbuNZcAEtlmmKv9CwAA//9v/YWrAAAABklEQVQDAEXzO1D687AkAAAAAElFTkSuQmCC",ballerina:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABXUlEQVR4AeyWzU3FMBCE/SFuVEAlUAZtUADUQgVwpgXK4MaNBjii4HlhHfvhZ28QSYQUKaP1/nh2vFainIUQhi0hAbH/dk8hYBiGsAby4yYBapwnllznvZKAJRu2uHcB+wT2CfyvCQABqL7WwMlcdcN3sDkBGElhtNqjrxiMPkxWceXnoilAZCI2yBfMz63iv0FXQI0UKMJQ+kWy43QFAIe7BRKVTp6cuDj2Y8j9NAWIOEfO+hkFGfL43HVTQI0MOEzkPCYNMMZiaPbjEgBTgyF8xH+4OtQdplr5PbgEiERXIduDt8543AJsw19btwDgMPqWAF0P0Cr5kXMJsLESLkIP6mD1WvfgEiASkRoe766Kv+djX/VeuAUY4dP9tS0LeypeFFWcJOD25jJ48PL6FoS8Vr6Qx3pr05IEPDy/W2xxm/dKAtRViTWgXoZCgAXXtBKgF3czSMCiB+6RfwEAAP//qq8O9wAAAAZJREFUAwAXykBQfIYJLwAAAABJRU5ErkJgggAA",chimp:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABFklEQVR4AeyXiw3CMAxEz4hR2IFdgDWYgjlgF3ZgFKSQi+TiQkXjtGklFMQpblz7Xizx6QZAWFMEiP7rvXsAIQQsIXvcBKCmNlEztn4JoKbZWO8G0CbQJtAm4JqAiEDkLfslIzK8b+8Zil0AbHA770ExFumb6j5zuXIDaGOafUpzntUNcLjcU39deaGxrtzLlQuAv2LamKcfiu09mv+1ugBsI572U15z9isCoDGLH09AxesSFQHQiMZcp6oIYC5zwhcBsHAu/QfAbhsfLuI/6pKpTJ4AzUuMtcYFICKpjqYqbpR8/llHJQDBCTlCOMZZfyunduieDgByRRIWehm/NIHOVhO1184Q6AOYxFIhASSaVdNY7xcAAAD//5gdaXYAAAAGSURBVAMA4pPVQcjVpCgAAAAASUVORK5CYIIA",lirili:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABP0lEQVR4AeyWQW7CMBBFZ6oeot33Pu2+3VVIsOc2iB0sORJ7LoGM3xBbTkDBEylBSJHy4vG34/9toZA3EQnPhADR/3lXK0AIQaag3K4FSKblwJh16WcBxjR7tPYcYD6B+QTmE3idE1BVUa3n0RswjbtOYLPdCfAwbUmpUdfiCpAWxXjx/5e6Qo2WBUfhDoAZlIbUaODwtqnVAfgLxYAWqG2FeKNGg1RHueqqDlC12oBJgwKoqlmxW6CjetWoPQwKkA3Cb/ykbciir3AHUG12innHS7UZ6+h9XVcAfmTQWlD3ucsYZKGicAVorYcxIKaW2smgAMvvj5vPdzSnt013B1j9fNqD9259Y/fmo1mA41mllvXhJNCdjwZdva+fA3y9iwDCFOAFeNkJUADiFOCVaAVI4pQtAXh7jEbcTO/aFwAAAP//UWg8AAAAAAZJREFUAwDFphBQC60XLQAAAABJRU5ErkJgggAA"};
+function pic(k){return IMG[k]}
+function shuf(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function mk(text,right,wrong,exp,pk){var o=shuf([right].concat(wrong));return [text,o,o.indexOf(right),exp,pk]}
+var CH=[["tung","Tung Tung Tung Sahur","A wooden log with a baseball bat"],["trala","Tralalero Tralala","A blue shark wearing sneakers"],["bomb","Bombardiro Crocodilo","Half crocodile, half bomber plane"],["ballerina","Ballerina Cappuccina","A ballerina with a cappuccino cup for a head"],["chimp","Chimpanzini Bananini","A chimpanzee with a banana body"],["lirili","Lirilì Larilà","An elephant with a cactus body and sandals"]];
+function f1(x){return x[1]}function f2(x){return x[2]}
+function gen(n,mode,base){
+  base=base||CH;var out=[],bag=[];
+  while(out.length<n){
+    if(!bag.length)bag=shuf(base);
+    var c=bag.pop(),oth=shuf(base.filter(function(x){return x!==c})).slice(0,2);
+    var t=mode==="pic"?0:mode==="desc"?1+Math.floor(Math.random()*2):Math.floor(Math.random()*3);
+    var ex=c[1]+": "+c[2]+".";
+    if(t===0)out.push(mk("Who is this?",c[1],oth.map(f1),ex,c[0]));
+    else if(t===1)out.push(mk("Which character is this?\n"+c[2],c[1],oth.map(f1),ex));
+    else out.push(mk("What is "+c[1]+"?",c[2],oth.map(f2),ex));
+  }
+  return out;
+}
+function clesson(idx){return function(){var cs=idx.map(function(i){return CH[i]});
+  return cs.map(function(c){return ["card",c[0],c[1],c[2]+"."]}).concat(gen(8,"mix",cs))}}
+function t2m(w,P){var wr=shuf(P.filter(function(x){return x!==w})).slice(0,2);return mk("What does “"+w[0]+"” mean?",w[1],wr.map(f2b),"“"+w[0]+"” means: "+w[1]+".")}
+function m2t(w,P){var wr=shuf(P.filter(function(x){return x!==w})).slice(0,2);return mk("Which word means:\n"+w[1]+"?",w[0],wr.map(function(x){return x[0]}),"That’s “"+w[0]+"”.")}
+function f2b(x){return x[1]}
+function vlesson(v,j){return function(){var w=v.slice(j*4,j*4+4),c=[],q=[];
+  w.forEach(function(x){c.push(["card",null,x[0],"Means: "+x[1]]);q.push(t2m(x,v));q.push(m2t(x,v))});
+  return c.concat(shuf(q))}}
+function vreview(v){return function(){return shuf(v).map(function(x){return Math.random()<.5?t2m(x,v):m2t(x,v)})}}
+var V1=[["rizz","Charm and flirting skill"],["no cap","No lie, being honest"],["W","A win"],["L","A loss"],["cooked","In big trouble"],["mid","Just average"],["bet","Okay, sounds good"],["sus","Suspicious"],["slay","Doing something amazingly well"],["bussin","Really delicious"],["drip","Stylish clothes and looks"],["flex","To show off"]];
+var V2=[["brainrot","Silly, low-quality content that fries your brain"],["lock in","Focus hard"],["crash out","An emotional meltdown"],["touch grass","Go outside and log off"],["rent free","Stuck in your head all the time"],["main character","Acting like the star of your own story"],["ghosting","Suddenly cutting off contact"],["yeet","To throw something with energy"],["delulu","Playfully delusional"],["the ick","A sudden turn-off"],["NPC","Someone who acts like a predictable background character"],["cheugy","Outdated or trying too hard"]];
+var V3=[["skibidi","A nonsense word from a viral meme"],["sigma","An independent lone wolf"],["fanum tax","Taking a bite of a friend’s food"],["aura","Your overall cool factor"],["mewing","A tongue posture trick for your jawline"],["glow up","A big improvement in looks or confidence"],["Ohio","The internet’s joke for weird, cursed things"],["fr fr","For real, for real"],["aura farming","Doing cool things to build your aura"],["menace","Someone chaotic in a fun way"],["lowkey","Kind of, or secretly"],["highkey","Very much, and openly"]];
+var V4=[["bruh","A reaction to something silly or disappointing"],["bffr","Be for real"],["smh","Shaking my head"],["ngl","Not gonna lie"],["tbh","To be honest"],["idk","I don’t know"],["irl","In real life"],["FOMO","Fear of missing out"],["GOAT","Greatest of all time"],["rn","Right now"],["imo","In my opinion"],["OP","The original poster"]];
+var V5=[["vibe check","Testing someone’s mood or energy"],["it’s giving","It has the energy of"],["understood the assignment","Did a great job"],["ate","Did it perfectly"],["chill","Relaxed and easygoing"],["salty","Annoyed or bitter"],["shook","Shocked or surprised"],["simp","Someone who does way too much for a crush"],["stan","A super-devoted fan"],["tea","Gossip"],["extra","Over the top and dramatic"],["no thoughts, head empty","Happily mindless"]];
+var V6=[["meme","A viral joke that spreads online"],["viral","Spreading fast online"],["troll","Someone who stirs up trouble online"],["clout","Fame and influence"],["cringe","Embarrassing in an awkward way"],["based","Confident and unbothered by what others think"],["copium","Coping through wishful thinking"],["ratio","When replies get more likes than the post"],["doomscrolling","Endlessly scrolling bad news"],["lurker","Someone who watches but never posts"],["FYP","The page of videos picked just for you"],["rickroll","A bait-and-switch prank with a famous song"]];
+var AV=V1.concat(V2,V3,V4,V5,V6);
+function allV(n){return shuf(AV).slice(0,n).map(function(x){return Math.random()<.5?t2m(x,AV):m2t(x,AV)})}
+function vunit(t,d,v){return {t:t,d:d,l:[["Lesson 1",vlesson(v,0)],["Lesson 2",vlesson(v,1)],["Lesson 3",vlesson(v,2)],["Review",vreview(v)]]}}
+var UN=[
+vunit("Slang Basics","Rizz, W, L and friends",V1),
+vunit("Online Words","Brainrot, touch grass, NPCs",V2),
+{t:"Italian Brainrot",d:"Meet the characters",l:[["Meet 1",clesson([0,1,2])],["Meet 2",clesson([3,4,5])],["Photo Quiz",function(){return gen(10,"pic")}],["Who’s Who",function(){return gen(10,"desc")}],["Master",function(){return gen(14,"mix")}]]},
+vunit("Gen Alpha","Skibidi, sigma, aura",V3),
+vunit("Chat Talk","Texting shortcuts",V4),
+vunit("Vibes & Mood","How it’s giving",V5),
+vunit("Meme Lore","Internet culture",V6),
+{t:"Final Boss",d:"Prove you’re fluent",l:[["Slang Master",function(){return allV(15)}],["Boss Fight",function(){return shuf(allV(12).concat(gen(8,"mix")))}]]}
+];
+var FL=[];UN.forEach(function(u,ui){u.l.forEach(function(l){FL.push({u:ui,n:l[0],f:l[1]})})});
+if(st.done>FL.length)st.done=FL.length;
+var BC=[["#58cc02","#2f7a00"],["#1cb0f6","#0c6fa3"],["#ff9600","#b36a00"],["#a560ff","#6a35b3"],["#00b8a0","#00766a"],["#ff6fb0","#b3457d"],["#ff4b4b","#a02020"],["#4a4a6a","#1b1b2a"]];
+function show(id){["home","path","quiz","end"].forEach(function(s){$(s).className="screen"+(s===id?" on":"")})}
+function drawPath(){
+  var t=$("track");t.innerHTML="";$("tbox").style.display="none";$("pxp").textContent="★ "+st.xp+" XP";
+  var all=st.done>=FL.length;
+  $("msg").textContent=all?"All units done! You speak fluent brainrot.":"";
+  $("msg").style.color=all?"var(--gd)":"var(--red)";
+  var fi=0;
+  UN.forEach(function(u,ui){
+    var c=BC[ui%BC.length],b=document.createElement("div");
+    b.className="banner";b.style.background=c[0];b.style.boxShadow="0 6px 0 "+c[1]+",0 6px 0 4px var(--line)";b.style.textShadow="2px 2px 0 "+c[1];
+    b.innerHTML="UNIT "+(ui+1)+"<b>"+u.t+"</b><span>"+u.d+"</span>";var sk=fi;if(sk>st.done){b.innerHTML+="<span style='margin-top:6px'>Tap to test out ▶</span>";b.onclick=function(){sfx("go");askUnit(sk)}}t.appendChild(b);
+    u.l.forEach(function(l){
+      var k=fi++,s=k<st.done?"done":k==st.done?"cur":"lock";
+      var w=document.createElement("div");w.className="step";
+      w.style.transform="translateX("+Math.round(Math.sin(k*1.3)*64)+"px)";
+      w.innerHTML=(s=="cur"?'<div class="go">START</div>':'')+'<button class="node '+s+'" aria-label="'+l[0]+'"><img class="sp" alt="" src="'+(s=="cur"?NA:NI)+'"><img class="ic" alt="" src="'+IC[s]+'"></button><div class="nm">'+l[0]+'</div>';
+      var bt=w.querySelector(".node"),sp=w.querySelector(".sp");
+      if(s=="done"){bt.onmouseenter=function(){sp.src=NA};bt.onmouseleave=function(){sp.src=NI}}
+      bt.onclick=function(){if(s=="lock"){if((k==0||FL[k-1].u!==FL[k].u)&&k>st.done){sfx("go");askUnit(k)}else{sfx("bonk");$("msg").style.color="var(--red)";$("msg").textContent="You can only skip whole units. Finish this unit’s lessons, or tap a later unit to test out."}}else{sfx("go");start(k)}};
+      t.appendChild(w);
+    });
+  });
+}
+var cu=0,QS=[],i=0,hp=5,xp=0,done=false,mh=5,tmode=-1,pendK=0;
+function hearts(){var h=$("hearts");h.innerHTML="";for(var k=0;k<mh;k++){var im=document.createElement("img");im.className="hrt";im.alt="";im.src=px(HP,k<hp?"#ff4b4b":"#8d8aa3");h.appendChild(im)}}
+function start(k){tmode=-1;mh=5;cu=k;QS=FL[k].f();i=0;hp=5;xp=0;show("quiz");ask()}
+function askTest(k){pendK=k;var n=k-st.done;$("ttxt").textContent="Jump ahead to “"+FL[k].n+"”? You’ll take a test on the "+n+" lesson"+(n>1?"s":"")+" you’d skip. You get 3 hearts. Pass to unlock it!";$("tbox").style.display="block"}
+function askUnit(k){pendK=k;var n=FL[k].u-FL[st.done].u,u=UN[FL[k].u];$("ttxt").textContent="Jump ahead to Unit "+(FL[k].u+1)+": "+u.t+"? You’ll take a test on the "+n+" unit"+(n>1?"s":"")+" you’d skip. Pass to unlock it! You get "+Math.min(5,2+n)+" hearts.";$("tbox").style.display="block"}
+function askGiant(){pendK=-1;$("ttxt").textContent="Take the GIANT TEST? It has 60 questions from every lesson and you get 5 hearts. Pass to unlock everything!";$("tbox").style.display="block"}
+function giant(){var pool=[];FL.forEach(function(l){shuf(l.f().filter(function(x){return x[0]!=="card"})).slice(0,2).forEach(function(x){pool.push(x)})});QS=shuf(pool).slice(0,60);tmode=FL.length;mh=5;hp=5;i=0;xp=0;show("quiz");ask()}
+function testOut(k){
+  var js=[];for(var j=st.done;j<k;j++)js.push(j);
+  var n=FL[k].u-FL[st.done].u,tot=Math.min(30,8+4*n),per=Math.ceil(tot/js.length),pool=[];
+  js.forEach(function(j){shuf(FL[j].f().filter(function(x){return x[0]!=="card"})).slice(0,per).forEach(function(x){pool.push(x)})});
+  QS=shuf(pool).slice(0,tot);tmode=k;mh=Math.min(5,2+n);i=0;hp=mh;xp=0;show("quiz");ask();
+}
+function tfinish(win){
+  $("fill").style.width="100%";
+  if(win){st.xp+=xp;if(tmode>st.done)st.done=tmode;save()}
+  sfx(win?"win":"lose");
+  $("et").textContent=win?"Test passed!":"Not quite there yet";
+  $("xp").textContent="+"+(win?xp:0)+" XP";
+  $("es").textContent=win?(tmode>=FL.length?"Everything is unlocked!":"You jumped ahead!"):"Take the lessons in order to level up.";
+  tmode=-1;show("end");
+}
+function ask(){
+  var q=QS[i],isc=q[0]==="card",pk=isc?q[1]:q[4];done=false;$("tl").style.display=tmode>=0?"block":"none";$("tl").textContent=tmode>=FL.length?"GIANT TEST: pass to unlock everything!":"TEST OUT: pass to jump ahead!";
+  $("qpic").style.display=pk?"block":"none";if(pk)$("qpic").src=pic(pk);
+  $("q").textContent=isc?q[2]:q[0];$("fb").textContent="";$("next").style.display="none";
+  $("fill").style.width=(i/QS.length*100)+"%";hearts();
+  var o=$("opts");o.innerHTML="";
+  if(isc){done=true;$("fb").style.color="var(--text)";$("fb").textContent=(pk?"":"NEW WORD!\n")+q[3];$("next").style.display="inline-block";return}
+  q[1].forEach(function(t,n){
+    var b=document.createElement("button");b.className="opt";b.textContent=t;
+    b.onclick=function(){pick(n)};o.appendChild(b);
+  });
+}
+function pick(n){
+  if(done)return;done=true;var q=QS[i],bs=$("opts").children;
+  for(var k=0;k<bs.length;k++)bs[k].disabled=true;
+  if(n===q[2]){bs[n].className="opt ok";sfx("ok");xp+=10;$("fb").style.color="var(--gd)";$("fb").textContent="Correct!\n"+q[3]}
+  else{bs[n].className="opt no";sfx("no");bs[q[2]].className="opt ok";hp--;hearts();$("fb").style.color="var(--rd)";$("fb").textContent="Not quite.\n"+q[3]}
+  $("next").style.display="inline-block";
+}
+$("next").onclick=function(){
+  if(hp<=0)return finish(false);
+  i++;if(i>=QS.length)return finish(true);ask();
+};
+function finish(win){if(tmode>=0)return tfinish(win);
+  $("fill").style.width="100%";
+  if(win){st.xp+=xp;if(cu==st.done&&st.done<FL.length)st.done++;save()}
+  sfx(win?"win":"lose");
+  $("et").textContent=win?"Lesson complete!":"Out of hearts!";
+  $("xp").textContent=win?"+"+xp+" XP":"+0 XP";
+  $("es").textContent=win?(st.done>cu&&st.done<FL.length&&cu==st.done-1?"Next lesson unlocked!":"Nice work."):"Give it another go.";
+  show("end");
+}
+function skipLesson(){
+  if(cu==st.done&&st.done<FL.length)st.done++;
+  save();sfx("ok");drawPath();show("path");window.scrollTo(0,0);
+  $("msg").style.color="var(--gd)";$("msg").textContent="Lesson skipped (test). Next lesson unlocked!";
+}
+$("play").onclick=function(){drawPath();show("path")};
+$("home2").onclick=function(){show("home")};
+$("quit").onclick=function(){drawPath();show("path")};
+$("again").onclick=function(){drawPath();show("path")};
+$("reset").onclick=function(){st={done:0,xp:0};save();drawPath()};
+$("unlock").onclick=askGiant;
+$("skip").onclick=function(){if(cu+1<=st.done){drawPath();show("path")}else testOut(cu+1)};
+$("tgo").onclick=function(){$("tbox").style.display="none";if(pendK<0)giant();else testOut(pendK)};
+$("tno").onclick=function(){$("tbox").style.display="none"};
+var pi=$("pimg"),idle=pi.src,anim=$("eimg").src;
+$("play").onmouseenter=function(){pi.src=anim};
+$("play").onmouseleave=function(){pi.src=idle};
+document.addEventListener("mousedown",function(){document.body.classList.add("down")});
+document.addEventListener("mouseup",function(){document.body.classList.remove("down")});
+document.addEventListener("click",function(e){if(e.target.closest&&e.target.closest(".sbtn:not(#mute),.big,#play"))sfx("click")});
+function mlabel(){$("mute").textContent=muted?"SFX OFF":"SFX ON"}
+mlabel();
+$("mute").onclick=function(){muted=!muted;try{localStorage.setItem("sl_mute",muted?"1":"0")}catch(e){}mlabel();sfx("click")};
+</script>
+</body></html>
